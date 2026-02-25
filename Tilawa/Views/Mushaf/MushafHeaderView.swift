@@ -37,12 +37,10 @@ struct MushafHeaderView: View {
             HStack(spacing: 4) {
                 if let surah {
                     Text("\(surah.number).")
-                        .foregroundStyle(.secondary)
+                    Text(surah.englishName)
+                    Text("·")
                     Text(surah.name)
                         .environment(\.layoutDirection, .rightToLeft)
-                    Text("·")
-                        .foregroundStyle(.secondary)
-                    Text(surah.englishName)
                     if let range = ayahRangeText {
                         Text("·")
                             .foregroundStyle(.secondary)
@@ -58,11 +56,11 @@ struct MushafHeaderView: View {
             HStack(spacing: 5) {
                 Text("Page \(mushafVM.currentPage)")
 
-                Text("·").foregroundStyle(.tertiary)
+                Text("·")
 
                 HStack(spacing: 4) {
                     Text("Juz \(juzInfo.juz)")
-                    Text("·").foregroundStyle(.tertiary)
+                    Text("·")
                     Text("Hizb \(juzInfo.hizb)")
                     if !thumunLabel.isEmpty {
                         Text(thumunLabel)
