@@ -55,16 +55,13 @@ struct JumpToAyahSheet: View {
                     Text("Surah").font(.caption).foregroundStyle(.secondary)
                     Picker("Surah", selection: $selectedSurah) {
                         ForEach(metadata.surahs, id: \.number) { surah in
-                            VStack(alignment: .center, spacing: 1) {
-                                HStack(spacing: 5) {
-                                    Text("\(surah.number).")
-                                        .foregroundStyle(.secondary)
-                                    Text(surah.name)
-                                        .environment(\.layoutDirection, .rightToLeft)
-                                }
-                                Text(surah.englishName)
+                            HStack {
+                                Text("\(surah.number). \(surah.englishName)")
+                                    .font(.caption)
+                                Spacer()
+                                Text(surah.name)
                                     .font(.caption2)
-                                    .foregroundStyle(.secondary)
+                                    .environment(\.layoutDirection, .rightToLeft)
                             }
                             .tag(surah.number)
                         }
@@ -87,11 +84,13 @@ struct JumpToAyahSheet: View {
                     Picker("Ayah", selection: $selectedAyah) {
                         let count = max(1, metadata.ayahCount(surah: selectedSurah))
                         ForEach(1...count, id: \.self) { ayah in
-                            Text("\(ayah)").tag(ayah)
+                            Text("\(ayah)")
+                                .font(.caption)
+                                .tag(ayah)
                         }
                     }
                     .pickerStyle(.wheel)
-                    .frame(maxWidth: 70)
+                    .frame(maxWidth: 50)
                     .id(selectedSurah) // Recreate wheel when surah changes so it scrolls to top
                     .onChange(of: selectedAyah) { _, newAyah in
                         selectedPage = metadata.page(for: AyahRef(surah: selectedSurah, ayah: newAyah))
@@ -105,11 +104,13 @@ struct JumpToAyahSheet: View {
                     Text("Page").font(.caption).foregroundStyle(.secondary)
                     Picker("Page", selection: $selectedPage) {
                         ForEach(1...604, id: \.self) { page in
-                            Text("\(page)").tag(page)
+                            Text("\(page)")
+                                .font(.caption)
+                                .tag(page)
                         }
                     }
                     .pickerStyle(.wheel)
-                    .frame(maxWidth: 70)
+                    .frame(maxWidth: 50)
                     .onChange(of: selectedPage) { _, newPage in
                         if let surah = metadata.surahOnPage(newPage) {
                             selectedSurah = surah.number
@@ -138,11 +139,13 @@ struct JumpToAyahSheet: View {
                     Text("Juz").font(.caption).foregroundStyle(.secondary)
                     Picker("Juz", selection: juzBinding) {
                         ForEach(1...30, id: \.self) { juz in
-                            Text("\(juz)").tag(juz)
+                            Text("\(juz)")
+                                .font(.caption)
+                                .tag(juz)
                         }
                     }
                     .pickerStyle(.wheel)
-                    .frame(maxWidth: 70)
+                    .frame(maxWidth: 50)
                     .id(juzService.juz(forPage: selectedPage)) // Scroll when juz changes
                 }
 
@@ -153,15 +156,16 @@ struct JumpToAyahSheet: View {
                     Text("Hizb").font(.caption).foregroundStyle(.secondary)
                     Picker("Hizb", selection: thumunBinding) {
                         ForEach(1...240, id: \.self) { t in
-                            Text(thumunLabel(t)).tag(t)
+                            Text(thumunLabel(t))
+                                .font(.caption)
+                                .tag(t)
                         }
                     }
                     .pickerStyle(.wheel)
-                    .frame(maxWidth: 70)
+                    .frame(maxWidth: 50)
                     .id(juzService.juzInfo(forPage: selectedPage).thumun) // Scroll when thumun changes
                 }
             }
-            .font(.subheadline)
             .navigationTitle("Jump to")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

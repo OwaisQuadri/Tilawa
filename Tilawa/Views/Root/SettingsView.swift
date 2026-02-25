@@ -33,8 +33,7 @@ struct SettingsView: View {
 
                 Section("Theme") {
                     Picker("Theme", selection: $vm.theme) {
-                        Text("Light").tag(MushafTheme.light)
-                        Text("Dark").tag(MushafTheme.dark)
+                        Text("Default").tag(MushafTheme.standard)
                         Text("Sepia").tag(MushafTheme.sepia)
                     }
                     .pickerStyle(.segmented)

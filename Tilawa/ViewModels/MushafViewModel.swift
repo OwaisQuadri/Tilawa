@@ -5,9 +5,19 @@ import Observation
 @Observable
 final class MushafViewModel {
 
+    // MARK: - UserDefaults Keys
+
+    private enum Keys {
+        static let currentPage = "mushaf.currentPage"
+        static let fontSize    = "mushaf.fontSize"
+        static let theme       = "mushaf.theme"
+    }
+
     // MARK: - Page State
 
-    var currentPage: Int = 1
+    var currentPage: Int = 1 {
+        didSet { UserDefaults.standard.set(currentPage, forKey: Keys.currentPage) }
+    }
     var showJumpSheet: Bool = false
     var currentPageAyahRange: (first: AyahRef, last: AyahRef)? = nil
 
@@ -18,12 +28,16 @@ final class MushafViewModel {
 
     // MARK: - Theme
 
-    var theme: MushafTheme = .light
+    var theme: MushafTheme = .standard {
+        didSet { UserDefaults.standard.set(theme.name, forKey: Keys.theme) }
+    }
 
     // MARK: - Font
 
     private let fontProvider: QuranFontProvider
-    var fontSize: CGFloat = 22.0
+    var fontSize: CGFloat = 22.0 {
+        didSet { UserDefaults.standard.set(Double(fontSize), forKey: Keys.fontSize) }
+    }
 
     var currentFont: CTFont {
         fontProvider.hafsFont(size: fontSize)
@@ -44,6 +58,17 @@ final class MushafViewModel {
          metadata: QuranMetadataService = .shared) {
         self.fontProvider = fontProvider
         self.metadata = metadata
+
+        let savedPage = UserDefaults.standard.integer(forKey: Keys.currentPage)
+        if savedPage > 0 { currentPage = savedPage }
+
+        let savedFontSize = UserDefaults.standard.double(forKey: Keys.fontSize)
+        if savedFontSize > 0 { fontSize = CGFloat(savedFontSize) }
+
+        if let savedThemeName = UserDefaults.standard.string(forKey: Keys.theme) {
+            // "Light" and "Dark" are legacy saved values → map to .standard
+            theme = [MushafTheme.standard, .sepia].first { $0.name == savedThemeName } ?? .standard
+        }
     }
 
     // MARK: - Word Tap Handling
