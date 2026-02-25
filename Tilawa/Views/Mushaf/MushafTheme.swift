@@ -1,37 +1,37 @@
-import UIKit
+import SwiftUI
 
-struct MushafTheme: Equatable, Sendable {
+struct MushafTheme: Equatable, Hashable, Sendable {
     let name: String
-    let backgroundColor: UIColor
-    let textColor: UIColor
-    let highlightColor: UIColor
-    let headerColor: UIColor
-    let pageBorderColor: UIColor
+    let backgroundColor: Color
+    let textColor: Color
+    let highlightColor: Color
+    let headerColor: Color
+    let pageBorderColor: Color
 
     static let light = MushafTheme(
         name: "Light",
-        backgroundColor: .systemBackground,
-        textColor: .label,
-        highlightColor: UIColor.systemYellow.withAlphaComponent(0.3),
-        headerColor: UIColor.systemBrown.withAlphaComponent(0.1),
-        pageBorderColor: UIColor.separator
+        backgroundColor: Color(.systemBackground),
+        textColor: Color(.label),
+        highlightColor: Color(.systemYellow).opacity(0.3),
+        headerColor: Color(.systemBrown).opacity(0.1),
+        pageBorderColor: .black
     )
 
     static let dark = MushafTheme(
         name: "Dark",
-        backgroundColor: UIColor(white: 0.1, alpha: 1),
-        textColor: UIColor(white: 0.9, alpha: 1),
-        highlightColor: UIColor.systemOrange.withAlphaComponent(0.3),
-        headerColor: UIColor(white: 0.15, alpha: 1),
-        pageBorderColor: UIColor(white: 0.25, alpha: 1)
+        backgroundColor: Color(white: 0.1),
+        textColor: Color(white: 0.9),
+        highlightColor: Color(.systemOrange).opacity(0.3),
+        headerColor: Color(white: 0.15),
+        pageBorderColor: Color(white: 0.25)
     )
 
     static let sepia = MushafTheme(
         name: "Sepia",
-        backgroundColor: UIColor(red: 0.96, green: 0.93, blue: 0.87, alpha: 1),
-        textColor: UIColor(red: 0.26, green: 0.20, blue: 0.14, alpha: 1),
-        highlightColor: UIColor.systemOrange.withAlphaComponent(0.25),
-        headerColor: UIColor(red: 0.90, green: 0.85, blue: 0.78, alpha: 1),
-        pageBorderColor: UIColor(red: 0.78, green: 0.72, blue: 0.64, alpha: 1)
+        backgroundColor: Color(red: 0.96, green: 0.93, blue: 0.87),
+        textColor: Color(red: 0.26, green: 0.20, blue: 0.14),
+        highlightColor: Color(.systemOrange).opacity(0.25),
+        headerColor: Color(red: 0.90, green: 0.85, blue: 0.78),
+        pageBorderColor: Color(red: 0.78, green: 0.72, blue: 0.64)
     )
 }

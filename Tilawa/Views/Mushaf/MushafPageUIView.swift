@@ -1,9 +1,10 @@
 import UIKit
+import SwiftUI
 import CoreText
 
-/// Renders a single Mushaf page using direct glyph path rendering.
-/// Text lines use CTFontCreatePathForGlyph with QPC V1 fonts, bypassing
-/// CoreText's Arabic shaper which decomposes presentation form codepoints.
+/// Pure Quran text renderer using direct glyph path rendering.
+/// Renders ONLY the Quran content (text lines, surah headers, basmala).
+/// All UI chrome (background, borders, padding) is handled by SwiftUI.
 final class MushafPageUIView: UIView {
 
     // MARK: - Public Configuration
@@ -13,11 +14,11 @@ final class MushafPageUIView: UIView {
     var highlightedWord: WordLocation? { didSet { setNeedsDisplay() } }
     var highlightedAyah: AyahRef? { didSet { setNeedsDisplay() } }
     var theme: MushafTheme = .light { didSet { setNeedsDisplay() } }
+    var centeredPage: Bool = false { didSet { rebuildLayout() } }
     var onWordTapped: ((WordLocation) -> Void)?
 
     // MARK: - Types
 
-    /// Identifies a specific word on a page.
     struct WordLocation: Equatable {
         let pageNumber: Int
         let lineIndex: Int
@@ -34,7 +35,6 @@ final class MushafPageUIView: UIView {
 
     // MARK: - Layout Cache
 
-    /// Glyph data for a single word, used for direct rendering.
     private struct WordGlyphData {
         let glyphs: [CGGlyph]
         let advances: [CGSize]
@@ -42,19 +42,19 @@ final class MushafPageUIView: UIView {
         let word: QULWord
     }
 
-    /// Layout for a single line — either CTLine-based (headers) or glyph-based (text).
     private enum LineRenderMode {
         case ctLine(CTLine)
-        case glyphs   // uses wordGlyphData from LineLayout
+        case glyphs
+        case surahHeader(glyph: CGGlyph, font: CTFont)
     }
 
     private struct LineLayout {
         let renderMode: LineRenderMode
-        let origin: CGPoint          // baseline origin in view coords (top-left system)
+        let origin: CGPoint
         let lineRect: CGRect
         let words: [WordLayout]
         let lineInfo: QULLine
-        let wordGlyphData: [WordGlyphData]  // only used for .glyphs mode
+        let wordGlyphData: [WordGlyphData]
     }
 
     struct WordLayout {
@@ -64,10 +64,8 @@ final class MushafPageUIView: UIView {
 
     private var lineLayouts: [LineLayout] = []
 
-    // MARK: - Layout Constants
-
-    private let contentPadding: CGFloat = 8
-    private let pageBorderWidth: CGFloat = 2
+    /// Horizontal inset to prevent glyph clipping at view edges.
+    private static let horizontalInset: CGFloat = 6
 
     // MARK: - Rebuild Layout
 
@@ -78,7 +76,8 @@ final class MushafPageUIView: UIView {
             return
         }
 
-        let availableWidth = bounds.width
+        let inset = Self.horizontalInset
+        let availableWidth = bounds.width - 2 * inset
         let lineCount = layout.lines.count
         guard lineCount > 0, availableWidth > 0 else {
             lineLayouts = []
@@ -87,23 +86,51 @@ final class MushafPageUIView: UIView {
         }
 
         let availableHeight = bounds.height
-        // Use fixed line height based on standard 15-line Mushaf page.
-        // Pages with fewer lines (e.g. pages 1-2) align to the top.
-        let standardLineCount: CGFloat = 15
-        let lineHeight = availableHeight / standardLineCount
+        let standardSlotCount = 15
+        let baseLineHeight = availableHeight / CGFloat(standardSlotCount)
+
+        // Build variable-height slot grid: headers get their actual glyph height,
+        // remaining space is shared among non-header slots.
+        var slotHeights = Array(repeating: baseLineHeight, count: standardSlotCount)
+        for line in layout.lines where line.type == .surahHeader {
+            let idx = line.line - 1
+            guard idx >= 0, idx < standardSlotCount else { continue }
+            let surahNum = Int(line.surah ?? "1") ?? 1
+            let h = Self.headerGlyphHeight(surahNumber: surahNum, availableWidth: availableWidth)
+            slotHeights[idx] = max(baseLineHeight, h + 4)
+        }
+
+        // Scale so total = availableHeight
+        let totalHeight = slotHeights.reduce(0, +)
+        if totalHeight > 0 {
+            let scale = availableHeight / totalHeight
+            slotHeights = slotHeights.map { $0 * scale }
+        }
+
+        // Cumulative Y positions
+        var slotTops = Array(repeating: CGFloat(0), count: standardSlotCount)
+        var cumY: CGFloat = 0
+        for i in 0..<standardSlotCount {
+            slotTops[i] = cumY
+            cumY += slotHeights[i]
+        }
 
         var layouts: [LineLayout] = []
 
-        for (_, line) in layout.lines.enumerated() {
-            let y = CGFloat(line.line - 1) * lineHeight + lineHeight * 0.7
+        for line in layout.lines {
+            let idx = line.line - 1
+            guard idx >= 0, idx < standardSlotCount else { continue }
+            let slotTop = slotTops[idx]
+            let slotHeight = slotHeights[idx]
+            let y = slotTop + slotHeight * 0.7
 
             switch line.type {
             case .surahHeader:
-                layouts.append(buildSurahHeaderLayout(line: line, font: font, y: y, availableWidth: availableWidth))
+                layouts.append(buildSurahHeaderLayout(line: line, font: font, slotTop: slotTop, availableWidth: availableWidth, lineHeight: slotHeight))
             case .basmala:
-                layouts.append(buildBasmalaLayout(line: line, font: font, y: y, availableWidth: availableWidth, lineHeight: lineHeight))
+                layouts.append(buildBasmalaLayout(line: line, font: font, y: y, availableWidth: availableWidth, lineHeight: slotHeight))
             case .text:
-                layouts.append(buildGlyphTextLayout(line: line, font: font, y: y, availableWidth: availableWidth, lineHeight: lineHeight))
+                layouts.append(buildGlyphTextLayout(line: line, font: font, y: y, availableWidth: availableWidth, lineHeight: slotHeight))
             }
         }
 
@@ -111,57 +138,88 @@ final class MushafPageUIView: UIView {
         setNeedsDisplay()
     }
 
-    // MARK: - Surah Header (surah-name-v2 ligature font)
+    /// Compute the height of a surah header glyph when scaled to fill the available width.
+    private static func headerGlyphHeight(surahNumber: Int, availableWidth: CGFloat) -> CGFloat {
+        let codepoints = QuranFontProvider.surahHeaderCodepoints
+        guard surahNumber >= 1, surahNumber <= codepoints.count else { return 0 }
 
-    private func buildSurahHeaderLayout(line: QULLine, font: CTFont, y: CGFloat, availableWidth: CGFloat) -> LineLayout {
-        let surahNumber = line.surah ?? "001"
-        let ligatureText = "surah\(surahNumber)"
+        let refSize: CGFloat = 100
+        let refFont = QuranFontProvider.shared.surahHeaderFont(size: refSize)
+        var chars: [UInt16] = [codepoints[surahNumber - 1]]
+        var glyphs = [CGGlyph](repeating: 0, count: 1)
+        CTFontGetGlyphsForCharacters(refFont, &chars, &glyphs, 1)
 
-        // Compute line height to constrain frame within one slot
-        let availableHeight = bounds.height
-        let lineHeight = availableHeight / 15
-        let framePadding: CGFloat = 4
+        var advances = [CGSize](repeating: .zero, count: 1)
+        CTFontGetAdvancesForGlyphs(refFont, .horizontal, &glyphs, &advances, 1)
+        guard advances[0].width > 0 else { return 0 }
 
-        // Size the surah name font to fit within the line height
-        let targetHeight = lineHeight - framePadding * 2
-        let headerFontSize = targetHeight * 0.7
-        let surahFont = QuranFontProvider.shared.surahNameFont(size: headerFontSize)
+        var bboxes = [CGRect](repeating: .zero, count: 1)
+        CTFontGetBoundingRectsForGlyphs(refFont, .horizontal, &glyphs, &bboxes, 1)
 
-        let attrStr = NSAttributedString(string: ligatureText, attributes: [
-            .font: surahFont as UIFont,
-            .foregroundColor: theme.textColor,
-            .ligature: 2  // enable all ligatures
-        ])
-        let ctLine = CTLineCreateWithAttributedString(attrStr)
-        let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
-        let x = (availableWidth) / 2
+        let scale = availableWidth / advances[0].width
+        return bboxes[0].height * scale
+    }
 
-        // Frame constrained to one line height slot
-        let frameY = y - lineHeight * 0.7
-        let frameHeight = lineHeight
+    // MARK: - Surah Header
+
+    private func buildSurahHeaderLayout(line: QULLine, font: CTFont, slotTop: CGFloat, availableWidth: CGFloat, lineHeight: CGFloat) -> LineLayout {
+        let surahNumber = Int(line.surah ?? "1") ?? 1
+        let codepoints = QuranFontProvider.surahHeaderCodepoints
+        guard surahNumber >= 1, surahNumber <= codepoints.count else {
+            return LineLayout(renderMode: .glyphs, origin: CGPoint(x: 0, y: slotTop),
+                              lineRect: .zero, words: [], lineInfo: line, wordGlyphData: [])
+        }
+
+        // Get glyph from the surah header font at a reference size to measure
+        let referenceFontSize: CGFloat = 100
+        let referenceFont = QuranFontProvider.shared.surahHeaderFont(size: referenceFontSize)
+        var chars: [UInt16] = [codepoints[surahNumber - 1]]
+        var glyphs = [CGGlyph](repeating: 0, count: 1)
+        CTFontGetGlyphsForCharacters(referenceFont, &chars, &glyphs, 1)
+
+        // Measure glyph advance at reference size
+        var advances = [CGSize](repeating: .zero, count: 1)
+        CTFontGetAdvancesForGlyphs(referenceFont, .horizontal, &glyphs, &advances, 1)
+        let refAdvance = advances[0].width
+        guard refAdvance > 0 else {
+            return LineLayout(renderMode: .glyphs, origin: CGPoint(x: 0, y: slotTop),
+                              lineRect: .zero, words: [], lineInfo: line, wordGlyphData: [])
+        }
+
+        // Scale font to fill available width (slot height already accommodates the glyph)
+        let finalFontSize = referenceFontSize * (availableWidth / refAdvance)
+        let finalFont = QuranFontProvider.shared.surahHeaderFont(size: finalFontSize)
+        CTFontGetGlyphsForCharacters(finalFont, &chars, &glyphs, 1)
+
+        // Compute bounding rect for vertical centering within the (taller) slot
+        var boundingRects = [CGRect](repeating: .zero, count: 1)
+        CTFontGetBoundingRectsForGlyphs(finalFont, .horizontal, &glyphs, &boundingRects, 1)
+        let bbox = boundingRects[0]
+
+        // Center glyph vertically in the slot
+        let baselineY = slotTop + (lineHeight - bbox.height) / 2 - bbox.origin.y
 
         return LineLayout(
-            renderMode: .ctLine(ctLine),
-            origin: CGPoint(x: x, y: y),
-            lineRect: CGRect(x: 0, y: frameY, width: availableWidth, height: frameHeight),
+            renderMode: .surahHeader(glyph: glyphs[0], font: finalFont),
+            origin: CGPoint(x: 0, y: baselineY),
+            lineRect: CGRect(x: 0, y: slotTop, width: availableWidth, height: lineHeight),
             words: [],
             lineInfo: line,
             wordGlyphData: []
         )
     }
 
-    // MARK: - Basmala (Hafs Unicode font with ﷽ ligature glyph)
+    // MARK: - Basmala
 
     private func buildBasmalaLayout(line: QULLine, font: CTFont, y: CGFloat, availableWidth: CGFloat, lineHeight: CGFloat) -> LineLayout {
         let basmalaFontSize = CTFontGetSize(font) * 0.85
         let basmalaFont = QuranFontProvider.shared.hafsFont(size: basmalaFontSize)
 
-        // U+FDFD — single basmala ligature glyph ﷽
         let basmalaText = "\u{FDFD}"
 
         let attrStr = NSAttributedString(string: basmalaText, attributes: [
             .font: basmalaFont as UIFont,
-            .foregroundColor: theme.textColor
+            .foregroundColor: UIColor(theme.textColor)
         ])
         let ctLine = CTLineCreateWithAttributedString(attrStr)
         let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
@@ -177,7 +235,7 @@ final class MushafPageUIView: UIView {
         )
     }
 
-    // MARK: - Text Lines (Direct Glyph Rendering — bypasses CoreText shaping)
+    // MARK: - Text Lines (Direct Glyph Rendering)
 
     private func buildGlyphTextLayout(line: QULLine, font: CTFont, y: CGFloat, availableWidth: CGFloat, lineHeight: CGFloat) -> LineLayout {
         guard let words = line.words, !words.isEmpty else {
@@ -190,7 +248,6 @@ final class MushafPageUIView: UIView {
 
         let fontSize = CTFontGetSize(font)
 
-        // Step 1: Convert each word's qpcV1 codepoints to glyph IDs via direct cmap lookup
         var wordGlyphs: [WordGlyphData] = []
         for word in words {
             let wordStr = word.qpcV1 ?? word.word
@@ -205,7 +262,6 @@ final class MushafPageUIView: UIView {
             wordGlyphs.append(WordGlyphData(glyphs: glyphs, advances: advances, totalAdvance: totalAdvance, word: word))
         }
 
-        // Step 2: Decide between justification and centering based on fill ratio
         let totalWordsWidth = wordGlyphs.reduce(0) { $0 + $1.totalAdvance }
         let gapCount = max(words.count - 1, 0)
         let fillRatio = availableWidth > 0 ? totalWordsWidth / availableWidth : 1
@@ -213,27 +269,25 @@ final class MushafPageUIView: UIView {
         let interWordSpacing: CGFloat
         let lineStartX: CGFloat
 
-        if fillRatio > 0.75 && fillRatio <= 1.2 && words.count > 2 {
-            // Justify: spread words across full available width (regular Mushaf lines)
+        if !centeredPage && words.count > 2 {
+            // QUL assigns words to lines for full-width justification
             let spacing = gapCount > 0 ? (availableWidth - totalWordsWidth) / CGFloat(gapCount) : 0
-            interWordSpacing = max(spacing, 0)  // prevent negative spacing
+            interWordSpacing = max(spacing, 0)
             lineStartX = 0
         } else {
-            // Center: use natural word gap (pages 1-2, short lines, end of surahs, overflow)
+            // Centered pages or short lines (1-2 words): center with natural spacing
             let naturalWordGap = fontSize * 0.25
             interWordSpacing = naturalWordGap
             let totalLineWidth = totalWordsWidth + naturalWordGap * CGFloat(gapCount)
             lineStartX = max((availableWidth - totalLineWidth) / 2, 0)
         }
 
-        // Step 3: Position words RTL (right to left)
         let totalLineWidth = totalWordsWidth + interWordSpacing * CGFloat(gapCount)
         var wordLayouts: [WordLayout] = []
-        var xCursor = lineStartX + totalLineWidth  // start from right edge
+        var xCursor = lineStartX + totalLineWidth
 
         for glyphData in wordGlyphs {
             xCursor -= glyphData.totalAdvance
-
             let wordRect = CGRect(
                 x: xCursor,
                 y: y - fontSize * 0.8,
@@ -241,7 +295,6 @@ final class MushafPageUIView: UIView {
                 height: lineHeight
             )
             wordLayouts.append(WordLayout(rect: wordRect, word: glyphData.word))
-
             xCursor -= interWordSpacing
         }
 
@@ -260,32 +313,13 @@ final class MushafPageUIView: UIView {
     override func draw(_ rect: CGRect) {
         guard let ctx = UIGraphicsGetCurrentContext() else { return }
 
-        // Background
-        ctx.setFillColor(theme.backgroundColor.cgColor)
-        ctx.fill(bounds)
-
-        // Page side indicator (binding edge)
-        drawPageSideIndicator(ctx)
-
-        // Flip for CoreText (UIKit is top-left origin, CT is bottom-left)
         ctx.saveGState()
         ctx.textMatrix = .identity
-        ctx.translateBy(x: 0, y: bounds.height)
+        ctx.translateBy(x: Self.horizontalInset, y: bounds.height)
         ctx.scaleBy(x: 1, y: -1)
 
         for lineLayout in lineLayouts {
-            // Draw decorative surah header frame
-            if lineLayout.lineInfo.type == .surahHeader {
-                let flippedRect = CGRect(
-                    x: lineLayout.lineRect.origin.x,
-                    y: bounds.height - lineLayout.lineRect.origin.y - lineLayout.lineRect.height,
-                    width: lineLayout.lineRect.width,
-                    height: lineLayout.lineRect.height
-                )
-                drawSurahHeaderFrame(in: ctx, rect: flippedRect)
-            }
-
-            // Draw word highlights
+            // Word highlights
             for wordLayout in lineLayout.words {
                 let shouldHighlightWord = highlightedWord.map {
                     $0.pageNumber == (pageLayout?.page ?? -1)
@@ -296,8 +330,8 @@ final class MushafPageUIView: UIView {
 
                 if shouldHighlightWord || shouldHighlightAyah {
                     let color = shouldHighlightWord
-                        ? theme.highlightColor.withAlphaComponent(0.5)
-                        : theme.highlightColor
+                        ? UIColor(theme.highlightColor).withAlphaComponent(0.5)
+                        : UIColor(theme.highlightColor)
                     ctx.setFillColor(color.cgColor)
                     let flippedRect = CGRect(
                         x: wordLayout.rect.origin.x,
@@ -311,43 +345,41 @@ final class MushafPageUIView: UIView {
                 }
             }
 
-            // Draw the line content
+            // Line content
             switch lineLayout.renderMode {
             case .ctLine(let ctLine):
-                // Standard CTLine rendering for headers/fallback basmala
                 let flippedY = bounds.height - lineLayout.origin.y
                 ctx.textPosition = CGPoint(x: lineLayout.origin.x, y: flippedY)
                 CTLineDraw(ctLine, ctx)
 
+            case .surahHeader(let glyph, let headerFont):
+                let flippedBaselineY = bounds.height - lineLayout.origin.y
+                ctx.setFillColor(UIColor(theme.textColor).cgColor)
+                if let glyphPath = CTFontCreatePathForGlyph(headerFont, glyph, nil) {
+                    var transform = CGAffineTransform(translationX: lineLayout.origin.x, y: flippedBaselineY)
+                    if let movedPath = glyphPath.copy(using: &transform) {
+                        ctx.addPath(movedPath)
+                        ctx.fillPath()
+                    }
+                }
+
             case .glyphs:
-                // Direct glyph rendering via CGPath — bypasses CoreText's Arabic shaper
                 guard let font = pageFont else { break }
 
                 let flippedBaselineY = bounds.height - lineLayout.origin.y
-                ctx.setFillColor(theme.textColor.cgColor)
+                ctx.setFillColor(UIColor(theme.textColor).cgColor)
 
                 for (wordIdx, glyphData) in lineLayout.wordGlyphData.enumerated() {
-                    let wordRect = wordIdx < lineLayout.words.count
-                        ? lineLayout.words[wordIdx].rect
-                        : nil
+                    let wordX = wordIdx < lineLayout.words.count
+                        ? lineLayout.words[wordIdx].rect.origin.x
+                        : lineLayout.origin.x
 
-                    let wordX = wordRect?.origin.x ?? lineLayout.origin.x
+                    let drawFont = font
 
-                    // Use the correct font for basmala lines
-                    let drawFont: CTFont
-                    if lineLayout.lineInfo.type == .basmala {
-                        let basmalaSize = CTFontGetSize(font) * 0.85
-                        drawFont = CTFontCreateCopyWithAttributes(font, basmalaSize, nil, nil)
-                    } else {
-                        drawFont = font
-                    }
-
-                    // Draw each glyph as a filled path (RTL: start from right edge, move left)
                     var xPos = wordX + glyphData.totalAdvance
                     for i in 0..<glyphData.glyphs.count {
                         xPos -= glyphData.advances[i].width
-                        let glyph = glyphData.glyphs[i]
-                        if let glyphPath = CTFontCreatePathForGlyph(drawFont, glyph, nil) {
+                        if let glyphPath = CTFontCreatePathForGlyph(drawFont, glyphData.glyphs[i], nil) {
                             var transform = CGAffineTransform(translationX: xPos, y: flippedBaselineY)
                             if let movedPath = glyphPath.copy(using: &transform) {
                                 ctx.addPath(movedPath)
@@ -362,102 +394,24 @@ final class MushafPageUIView: UIView {
         ctx.restoreGState()
     }
 
-    /// Draws a thin decorative border on the outer (binding) edge of the page.
-    /// Odd pages: border on right. Even pages: border on left.
-    private func drawPageSideIndicator(_ ctx: CGContext) {
-        let pageNumber = pageLayout?.page ?? 1
-        let isOddPage = pageNumber % 2 == 1
-
-        let borderX: CGFloat = isOddPage
-            ? bounds.width - pageBorderWidth
-            : 0
-
-        // Main border line
-        ctx.setFillColor(theme.pageBorderColor.cgColor)
-        ctx.fill(CGRect(x: borderX, y: 0, width: pageBorderWidth, height: bounds.height))
-
-        // Subtle shadow gradient toward the binding edge
-        let shadowWidth: CGFloat = 8
-        let shadowX: CGFloat = isOddPage
-            ? bounds.width - pageBorderWidth - shadowWidth
-            : pageBorderWidth
-
-        let startColor = theme.pageBorderColor.withAlphaComponent(0.5).cgColor
-        let endColor = UIColor.clear.cgColor
-        let colors = isOddPage ? [endColor, startColor] : [startColor, endColor]
-
-        guard let gradient = CGGradient(colorsSpace: CGColorSpaceCreateDeviceRGB(),
-                                         colors: colors as CFArray,
-                                         locations: nil) else { return }
-        ctx.drawLinearGradient(gradient,
-                               start: CGPoint(x: shadowX, y: 0),
-                               end: CGPoint(x: shadowX + shadowWidth, y: 0),
-                               options: [])
-    }
-
-    /// Draws an ornamental frame around the surah header, inspired by the Madinah Mushaf cartouche.
-    private func drawSurahHeaderFrame(in ctx: CGContext, rect: CGRect) {
-        let inset: CGFloat = 4
-        let outerRect = rect.insetBy(dx: inset, dy: 0)
-        let innerRect = outerRect.insetBy(dx: 5, dy: 5)
-        let cornerRadius: CGFloat = 8
-        let innerCornerRadius: CGFloat = 4
-        let borderColor = theme.pageBorderColor.cgColor
-        let fillColor = theme.headerColor.cgColor
-
-        // Outer rounded rect fill
-        let outerPath = UIBezierPath(roundedRect: outerRect, cornerRadius: cornerRadius)
-        ctx.setFillColor(fillColor)
-        ctx.addPath(outerPath.cgPath)
-        ctx.fillPath()
-
-        // Outer border
-        ctx.setStrokeColor(borderColor)
-        ctx.setLineWidth(1.5)
-        ctx.addPath(outerPath.cgPath)
-        ctx.strokePath()
-
-        // Inner border (double-border effect)
-        let innerPath = UIBezierPath(roundedRect: innerRect, cornerRadius: innerCornerRadius)
-        ctx.setLineWidth(0.75)
-        ctx.addPath(innerPath.cgPath)
-        ctx.strokePath()
-
-        // Decorative diamonds at left and right center of the frame
-        let diamondSize: CGFloat = 6
-        let midY = outerRect.midY
-        for x in [outerRect.minX + 12, outerRect.maxX - 12] {
-            let diamond = UIBezierPath()
-            diamond.move(to: CGPoint(x: x, y: midY - diamondSize))
-            diamond.addLine(to: CGPoint(x: x + diamondSize, y: midY))
-            diamond.addLine(to: CGPoint(x: x, y: midY + diamondSize))
-            diamond.addLine(to: CGPoint(x: x - diamondSize, y: midY))
-            diamond.close()
-            ctx.setFillColor(borderColor)
-            ctx.addPath(diamond.cgPath)
-            ctx.fillPath()
-        }
-    }
-
     // MARK: - Hit Testing
 
     override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         let point = touch.location(in: self)
-
         if let wordLocation = wordAt(point: point) {
             onWordTapped?(wordLocation)
         }
     }
 
-    /// Find which word contains the given point.
     func wordAt(point: CGPoint) -> WordLocation? {
         guard let layout = pageLayout else { return nil }
-
+        // Adjust for horizontal inset used in rendering
+        let adjustedPoint = CGPoint(x: point.x - Self.horizontalInset, y: point.y)
         for (lineIndex, lineLayout) in lineLayouts.enumerated() {
             for (wordIndex, wordLayout) in lineLayout.words.enumerated() {
                 let hitRect = wordLayout.rect.insetBy(dx: -4, dy: -4)
-                if hitRect.contains(point) {
+                if hitRect.contains(adjustedPoint) {
                     return WordLocation(
                         pageNumber: layout.page,
                         lineIndex: lineIndex,

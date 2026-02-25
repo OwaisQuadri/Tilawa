@@ -22,7 +22,7 @@ final class MushafViewModel {
     // MARK: - Font
 
     private let fontProvider: QuranFontProvider
-    private(set) var fontSize: CGFloat = 24.0
+    var fontSize: CGFloat = 22.0
 
     var currentFont: CTFont {
         fontProvider.hafsFont(size: fontSize)
@@ -103,8 +103,8 @@ final class MushafViewModel {
 
     // MARK: - Font Size
 
-    func increaseFontSize() { fontSize = min(48, fontSize + 2) }
-    func decreaseFontSize() { fontSize = max(16, fontSize - 2) }
+    func increaseFontSize() { fontSize = min(QuranFontProvider.maxFontSize, fontSize + 1) }
+    func decreaseFontSize() { fontSize = max(QuranFontProvider.minFontSize, fontSize - 1) }
 
     // MARK: - Current Surah Info
 

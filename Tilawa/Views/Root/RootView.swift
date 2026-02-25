@@ -14,8 +14,7 @@ struct RootView: View {
             }
 
             Tab("Settings", systemImage: "gearshape") {
-                Text("Settings")
-                    .foregroundStyle(.secondary)
+                SettingsView()
             }
         }
     }
