@@ -1,0 +1,802 @@
+{
+  "surahs": [
+    {
+      "number": 1,
+      "name": "\u0627\u0644\u0641\u0627\u062a\u062d\u0629",
+      "englishName": "Al-Fatihah",
+      "ayahCount": 7,
+      "startPage": 1
+    },
+    {
+      "number": 2,
+      "name": "\u0627\u0644\u0628\u0642\u0631\u0629",
+      "englishName": "Al-Baqarah",
+      "ayahCount": 286,
+      "startPage": 2
+    },
+    {
+      "number": 3,
+      "name": "\u0622\u0644 \u0639\u0645\u0631\u0627\u0646",
+      "englishName": "Ali 'Imran",
+      "ayahCount": 200,
+      "startPage": 50
+    },
+    {
+      "number": 4,
+      "name": "\u0627\u0644\u0646\u0633\u0627\u0621",
+      "englishName": "An-Nisa'",
+      "ayahCount": 176,
+      "startPage": 77
+    },
+    {
+      "number": 5,
+      "name": "\u0627\u0644\u0645\u0627\u0626\u062f\u0629",
+      "englishName": "Al-Ma'idah",
+      "ayahCount": 120,
+      "startPage": 106
+    },
+    {
+      "number": 6,
+      "name": "\u0627\u0644\u0623\u0646\u0639\u0627\u0645",
+      "englishName": "Al-An'am",
+      "ayahCount": 165,
+      "startPage": 128
+    },
+    {
+      "number": 7,
+      "name": "\u0627\u0644\u0623\u0639\u0631\u0627\u0641",
+      "englishName": "Al-A'raf",
+      "ayahCount": 206,
+      "startPage": 151
+    },
+    {
+      "number": 8,
+      "name": "\u0627\u0644\u0623\u0646\u0641\u0627\u0644",
+      "englishName": "Al-Anfal",
+      "ayahCount": 75,
+      "startPage": 177
+    },
+    {
+      "number": 9,
+      "name": "\u0627\u0644\u062a\u0648\u0628\u0629",
+      "englishName": "At-Tawbah",
+      "ayahCount": 129,
+      "startPage": 187
+    },
+    {
+      "number": 10,
+      "name": "\u064a\u0648\u0646\u0633",
+      "englishName": "Yunus",
+      "ayahCount": 109,
+      "startPage": 208
+    },
+    {
+      "number": 11,
+      "name": "\u0647\u0648\u062f",
+      "englishName": "Hud",
+      "ayahCount": 123,
+      "startPage": 221
+    },
+    {
+      "number": 12,
+      "name": "\u064a\u0648\u0633\u0641",
+      "englishName": "Yusuf",
+      "ayahCount": 111,
+      "startPage": 235
+    },
+    {
+      "number": 13,
+      "name": "\u0627\u0644\u0631\u0639\u062f",
+      "englishName": "Ar-Ra'd",
+      "ayahCount": 43,
+      "startPage": 249
+    },
+    {
+      "number": 14,
+      "name": "\u0625\u0628\u0631\u0627\u0647\u064a\u0645",
+      "englishName": "Ibrahim",
+      "ayahCount": 52,
+      "startPage": 255
+    },
+    {
+      "number": 15,
+      "name": "\u0627\u0644\u062d\u062c\u0631",
+      "englishName": "Al-Hijr",
+      "ayahCount": 99,
+      "startPage": 262
+    },
+    {
+      "number": 16,
+      "name": "\u0627\u0644\u0646\u062d\u0644",
+      "englishName": "An-Nahl",
+      "ayahCount": 128,
+      "startPage": 267
+    },
+    {
+      "number": 17,
+      "name": "\u0627\u0644\u0625\u0633\u0631\u0627\u0621",
+      "englishName": "Al-Isra'",
+      "ayahCount": 111,
+      "startPage": 282
+    },
+    {
+      "number": 18,
+      "name": "\u0627\u0644\u0643\u0647\u0641",
+      "englishName": "Al-Kahf",
+      "ayahCount": 110,
+      "startPage": 293
+    },
+    {
+      "number": 19,
+      "name": "\u0645\u0631\u064a\u0645",
+      "englishName": "Maryam",
+      "ayahCount": 98,
+      "startPage": 305
+    },
+    {
+      "number": 20,
+      "name": "\u0637\u0647",
+      "englishName": "Ta-Ha",
+      "ayahCount": 135,
+      "startPage": 312
+    },
+    {
+      "number": 21,
+      "name": "\u0627\u0644\u0623\u0646\u0628\u064a\u0627\u0621",
+      "englishName": "Al-Anbiya'",
+      "ayahCount": 112,
+      "startPage": 322
+    },
+    {
+      "number": 22,
+      "name": "\u0627\u0644\u062d\u062c",
+      "englishName": "Al-Hajj",
+      "ayahCount": 78,
+      "startPage": 332
+    },
+    {
+      "number": 23,
+      "name": "\u0627\u0644\u0645\u0624\u0645\u0646\u0648\u0646",
+      "englishName": "Al-Mu'minun",
+      "ayahCount": 118,
+      "startPage": 342
+    },
+    {
+      "number": 24,
+      "name": "\u0627\u0644\u0646\u0648\u0631",
+      "englishName": "An-Nur",
+      "ayahCount": 64,
+      "startPage": 350
+    },
+    {
+      "number": 25,
+      "name": "\u0627\u0644\u0641\u0631\u0642\u0627\u0646",
+      "englishName": "Al-Furqan",
+      "ayahCount": 77,
+      "startPage": 359
+    },
+    {
+      "number": 26,
+      "name": "\u0627\u0644\u0634\u0639\u0631\u0627\u0621",
+      "englishName": "Ash-Shu'ara'",
+      "ayahCount": 227,
+      "startPage": 367
+    },
+    {
+      "number": 27,
+      "name": "\u0627\u0644\u0646\u0645\u0644",
+      "englishName": "An-Naml",
+      "ayahCount": 93,
+      "startPage": 377
+    },
+    {
+      "number": 28,
+      "name": "\u0627\u0644\u0642\u0635\u0635",
+      "englishName": "Al-Qasas",
+      "ayahCount": 88,
+      "startPage": 385
+    },
+    {
+      "number": 29,
+      "name": "\u0627\u0644\u0639\u0646\u0643\u0628\u0648\u062a",
+      "englishName": "Al-'Ankabut",
+      "ayahCount": 69,
+      "startPage": 396
+    },
+    {
+      "number": 30,
+      "name": "\u0627\u0644\u0631\u0648\u0645",
+      "englishName": "Ar-Rum",
+      "ayahCount": 60,
+      "startPage": 404
+    },
+    {
+      "number": 31,
+      "name": "\u0644\u0642\u0645\u0627\u0646",
+      "englishName": "Luqman",
+      "ayahCount": 34,
+      "startPage": 411
+    },
+    {
+      "number": 32,
+      "name": "\u0627\u0644\u0633\u062c\u062f\u0629",
+      "englishName": "As-Sajdah",
+      "ayahCount": 30,
+      "startPage": 415
+    },
+    {
+      "number": 33,
+      "name": "\u0627\u0644\u0623\u062d\u0632\u0627\u0628",
+      "englishName": "Al-Ahzab",
+      "ayahCount": 73,
+      "startPage": 418
+    },
+    {
+      "number": 34,
+      "name": "\u0633\u0628\u0623",
+      "englishName": "Saba'",
+      "ayahCount": 54,
+      "startPage": 428
+    },
+    {
+      "number": 35,
+      "name": "\u0641\u0627\u0637\u0631",
+      "englishName": "Fatir",
+      "ayahCount": 45,
+      "startPage": 434
+    },
+    {
+      "number": 36,
+      "name": "\u064a\u0633",
+      "englishName": "Ya-Sin",
+      "ayahCount": 83,
+      "startPage": 440
+    },
+    {
+      "number": 37,
+      "name": "\u0627\u0644\u0635\u0627\u0641\u0627\u062a",
+      "englishName": "As-Saffat",
+      "ayahCount": 182,
+      "startPage": 446
+    },
+    {
+      "number": 38,
+      "name": "\u0635",
+      "englishName": "Sad",
+      "ayahCount": 88,
+      "startPage": 453
+    },
+    {
+      "number": 39,
+      "name": "\u0627\u0644\u0632\u0645\u0631",
+      "englishName": "Az-Zumar",
+      "ayahCount": 75,
+      "startPage": 458
+    },
+    {
+      "number": 40,
+      "name": "\u063a\u0627\u0641\u0631",
+      "englishName": "Ghafir",
+      "ayahCount": 85,
+      "startPage": 467
+    },
+    {
+      "number": 41,
+      "name": "\u0641\u0635\u0644\u062a",
+      "englishName": "Fussilat",
+      "ayahCount": 54,
+      "startPage": 477
+    },
+    {
+      "number": 42,
+      "name": "\u0627\u0644\u0634\u0648\u0631\u0649",
+      "englishName": "Ash-Shura",
+      "ayahCount": 53,
+      "startPage": 483
+    },
+    {
+      "number": 43,
+      "name": "\u0627\u0644\u0632\u062e\u0631\u0641",
+      "englishName": "Az-Zukhruf",
+      "ayahCount": 89,
+      "startPage": 489
+    },
+    {
+      "number": 44,
+      "name": "\u0627\u0644\u062f\u062e\u0627\u0646",
+      "englishName": "Ad-Dukhan",
+      "ayahCount": 59,
+      "startPage": 496
+    },
+    {
+      "number": 45,
+      "name": "\u0627\u0644\u062c\u0627\u062b\u064a\u0629",
+      "englishName": "Al-Jathiyah",
+      "ayahCount": 37,
+      "startPage": 499
+    },
+    {
+      "number": 46,
+      "name": "\u0627\u0644\u0623\u062d\u0642\u0627\u0641",
+      "englishName": "Al-Ahqaf",
+      "ayahCount": 35,
+      "startPage": 502
+    },
+    {
+      "number": 47,
+      "name": "\u0645\u062d\u0645\u062f",
+      "englishName": "Muhammad",
+      "ayahCount": 38,
+      "startPage": 507
+    },
+    {
+      "number": 48,
+      "name": "\u0627\u0644\u0641\u062a\u062d",
+      "englishName": "Al-Fath",
+      "ayahCount": 29,
+      "startPage": 511
+    },
+    {
+      "number": 49,
+      "name": "\u0627\u0644\u062d\u062c\u0631\u0627\u062a",
+      "englishName": "Al-Hujurat",
+      "ayahCount": 18,
+      "startPage": 515
+    },
+    {
+      "number": 50,
+      "name": "\u0642",
+      "englishName": "Qaf",
+      "ayahCount": 45,
+      "startPage": 518
+    },
+    {
+      "number": 51,
+      "name": "\u0627\u0644\u0630\u0627\u0631\u064a\u0627\u062a",
+      "englishName": "Adh-Dhariyat",
+      "ayahCount": 60,
+      "startPage": 520
+    },
+    {
+      "number": 52,
+      "name": "\u0627\u0644\u0637\u0648\u0631",
+      "englishName": "At-Tur",
+      "ayahCount": 49,
+      "startPage": 523
+    },
+    {
+      "number": 53,
+      "name": "\u0627\u0644\u0646\u062c\u0645",
+      "englishName": "An-Najm",
+      "ayahCount": 62,
+      "startPage": 526
+    },
+    {
+      "number": 54,
+      "name": "\u0627\u0644\u0642\u0645\u0631",
+      "englishName": "Al-Qamar",
+      "ayahCount": 55,
+      "startPage": 528
+    },
+    {
+      "number": 55,
+      "name": "\u0627\u0644\u0631\u062d\u0645\u0646",
+      "englishName": "Ar-Rahman",
+      "ayahCount": 78,
+      "startPage": 531
+    },
+    {
+      "number": 56,
+      "name": "\u0627\u0644\u0648\u0627\u0642\u0639\u0629",
+      "englishName": "Al-Waqi'ah",
+      "ayahCount": 96,
+      "startPage": 534
+    },
+    {
+      "number": 57,
+      "name": "\u0627\u0644\u062d\u062f\u064a\u062f",
+      "englishName": "Al-Hadid",
+      "ayahCount": 29,
+      "startPage": 537
+    },
+    {
+      "number": 58,
+      "name": "\u0627\u0644\u0645\u062c\u0627\u062f\u0644\u0629",
+      "englishName": "Al-Mujadilah",
+      "ayahCount": 22,
+      "startPage": 542
+    },
+    {
+      "number": 59,
+      "name": "\u0627\u0644\u062d\u0634\u0631",
+      "englishName": "Al-Hashr",
+      "ayahCount": 24,
+      "startPage": 545
+    },
+    {
+      "number": 60,
+      "name": "\u0627\u0644\u0645\u0645\u062a\u062d\u0646\u0629",
+      "englishName": "Al-Mumtahanah",
+      "ayahCount": 13,
+      "startPage": 549
+    },
+    {
+      "number": 61,
+      "name": "\u0627\u0644\u0635\u0641",
+      "englishName": "As-Saff",
+      "ayahCount": 14,
+      "startPage": 551
+    },
+    {
+      "number": 62,
+      "name": "\u0627\u0644\u062c\u0645\u0639\u0629",
+      "englishName": "Al-Jumu'ah",
+      "ayahCount": 11,
+      "startPage": 553
+    },
+    {
+      "number": 63,
+      "name": "\u0627\u0644\u0645\u0646\u0627\u0641\u0642\u0648\u0646",
+      "englishName": "Al-Munafiqun",
+      "ayahCount": 11,
+      "startPage": 554
+    },
+    {
+      "number": 64,
+      "name": "\u0627\u0644\u062a\u063a\u0627\u0628\u0646",
+      "englishName": "At-Taghabun",
+      "ayahCount": 18,
+      "startPage": 556
+    },
+    {
+      "number": 65,
+      "name": "\u0627\u0644\u0637\u0644\u0627\u0642",
+      "englishName": "At-Talaq",
+      "ayahCount": 12,
+      "startPage": 558
+    },
+    {
+      "number": 66,
+      "name": "\u0627\u0644\u062a\u062d\u0631\u064a\u0645",
+      "englishName": "At-Tahrim",
+      "ayahCount": 12,
+      "startPage": 560
+    },
+    {
+      "number": 67,
+      "name": "\u0627\u0644\u0645\u0644\u0643",
+      "englishName": "Al-Mulk",
+      "ayahCount": 30,
+      "startPage": 562
+    },
+    {
+      "number": 68,
+      "name": "\u0627\u0644\u0642\u0644\u0645",
+      "englishName": "Al-Qalam",
+      "ayahCount": 52,
+      "startPage": 564
+    },
+    {
+      "number": 69,
+      "name": "\u0627\u0644\u062d\u0627\u0642\u0629",
+      "englishName": "Al-Haqqah",
+      "ayahCount": 52,
+      "startPage": 566
+    },
+    {
+      "number": 70,
+      "name": "\u0627\u0644\u0645\u0639\u0627\u0631\u062c",
+      "englishName": "Al-Ma'arij",
+      "ayahCount": 44,
+      "startPage": 568
+    },
+    {
+      "number": 71,
+      "name": "\u0646\u0648\u062d",
+      "englishName": "Nuh",
+      "ayahCount": 28,
+      "startPage": 570
+    },
+    {
+      "number": 72,
+      "name": "\u0627\u0644\u062c\u0646",
+      "englishName": "Al-Jinn",
+      "ayahCount": 28,
+      "startPage": 572
+    },
+    {
+      "number": 73,
+      "name": "\u0627\u0644\u0645\u0632\u0645\u0644",
+      "englishName": "Al-Muzzammil",
+      "ayahCount": 20,
+      "startPage": 574
+    },
+    {
+      "number": 74,
+      "name": "\u0627\u0644\u0645\u062f\u062b\u0631",
+      "englishName": "Al-Muddaththir",
+      "ayahCount": 56,
+      "startPage": 575
+    },
+    {
+      "number": 75,
+      "name": "\u0627\u0644\u0642\u064a\u0627\u0645\u0629",
+      "englishName": "Al-Qiyamah",
+      "ayahCount": 40,
+      "startPage": 577
+    },
+    {
+      "number": 76,
+      "name": "\u0627\u0644\u0625\u0646\u0633\u0627\u0646",
+      "englishName": "Al-Insan",
+      "ayahCount": 31,
+      "startPage": 578
+    },
+    {
+      "number": 77,
+      "name": "\u0627\u0644\u0645\u0631\u0633\u0644\u0627\u062a",
+      "englishName": "Al-Mursalat",
+      "ayahCount": 50,
+      "startPage": 580
+    },
+    {
+      "number": 78,
+      "name": "\u0627\u0644\u0646\u0628\u0623",
+      "englishName": "An-Naba'",
+      "ayahCount": 40,
+      "startPage": 582
+    },
+    {
+      "number": 79,
+      "name": "\u0627\u0644\u0646\u0627\u0632\u0639\u0627\u062a",
+      "englishName": "An-Nazi'at",
+      "ayahCount": 46,
+      "startPage": 583
+    },
+    {
+      "number": 80,
+      "name": "\u0639\u0628\u0633",
+      "englishName": "'Abasa",
+      "ayahCount": 42,
+      "startPage": 585
+    },
+    {
+      "number": 81,
+      "name": "\u0627\u0644\u062a\u0643\u0648\u064a\u0631",
+      "englishName": "At-Takwir",
+      "ayahCount": 29,
+      "startPage": 586
+    },
+    {
+      "number": 82,
+      "name": "\u0627\u0644\u0627\u0646\u0641\u0637\u0627\u0631",
+      "englishName": "Al-Infitar",
+      "ayahCount": 19,
+      "startPage": 587
+    },
+    {
+      "number": 83,
+      "name": "\u0627\u0644\u0645\u0637\u0641\u0641\u064a\u0646",
+      "englishName": "Al-Mutaffifin",
+      "ayahCount": 36,
+      "startPage": 587
+    },
+    {
+      "number": 84,
+      "name": "\u0627\u0644\u0627\u0646\u0634\u0642\u0627\u0642",
+      "englishName": "Al-Inshiqaq",
+      "ayahCount": 25,
+      "startPage": 589
+    },
+    {
+      "number": 85,
+      "name": "\u0627\u0644\u0628\u0631\u0648\u062c",
+      "englishName": "Al-Buruj",
+      "ayahCount": 22,
+      "startPage": 590
+    },
+    {
+      "number": 86,
+      "name": "\u0627\u0644\u0637\u0627\u0631\u0642",
+      "englishName": "At-Tariq",
+      "ayahCount": 17,
+      "startPage": 591
+    },
+    {
+      "number": 87,
+      "name": "\u0627\u0644\u0623\u0639\u0644\u0649",
+      "englishName": "Al-A'la",
+      "ayahCount": 19,
+      "startPage": 591
+    },
+    {
+      "number": 88,
+      "name": "\u0627\u0644\u063a\u0627\u0634\u064a\u0629",
+      "englishName": "Al-Ghashiyah",
+      "ayahCount": 26,
+      "startPage": 592
+    },
+    {
+      "number": 89,
+      "name": "\u0627\u0644\u0641\u062c\u0631",
+      "englishName": "Al-Fajr",
+      "ayahCount": 30,
+      "startPage": 593
+    },
+    {
+      "number": 90,
+      "name": "\u0627\u0644\u0628\u0644\u062f",
+      "englishName": "Al-Balad",
+      "ayahCount": 20,
+      "startPage": 594
+    },
+    {
+      "number": 91,
+      "name": "\u0627\u0644\u0634\u0645\u0633",
+      "englishName": "Ash-Shams",
+      "ayahCount": 15,
+      "startPage": 595
+    },
+    {
+      "number": 92,
+      "name": "\u0627\u0644\u0644\u064a\u0644",
+      "englishName": "Al-Layl",
+      "ayahCount": 21,
+      "startPage": 595
+    },
+    {
+      "number": 93,
+      "name": "\u0627\u0644\u0636\u062d\u0649",
+      "englishName": "Ad-Duha",
+      "ayahCount": 11,
+      "startPage": 596
+    },
+    {
+      "number": 94,
+      "name": "\u0627\u0644\u0634\u0631\u062d",
+      "englishName": "Ash-Sharh",
+      "ayahCount": 8,
+      "startPage": 596
+    },
+    {
+      "number": 95,
+      "name": "\u0627\u0644\u062a\u064a\u0646",
+      "englishName": "At-Tin",
+      "ayahCount": 8,
+      "startPage": 597
+    },
+    {
+      "number": 96,
+      "name": "\u0627\u0644\u0639\u0644\u0642",
+      "englishName": "Al-'Alaq",
+      "ayahCount": 19,
+      "startPage": 597
+    },
+    {
+      "number": 97,
+      "name": "\u0627\u0644\u0642\u062f\u0631",
+      "englishName": "Al-Qadr",
+      "ayahCount": 5,
+      "startPage": 598
+    },
+    {
+      "number": 98,
+      "name": "\u0627\u0644\u0628\u064a\u0646\u0629",
+      "englishName": "Al-Bayyinah",
+      "ayahCount": 8,
+      "startPage": 598
+    },
+    {
+      "number": 99,
+      "name": "\u0627\u0644\u0632\u0644\u0632\u0644\u0629",
+      "englishName": "Az-Zalzalah",
+      "ayahCount": 8,
+      "startPage": 599
+    },
+    {
+      "number": 100,
+      "name": "\u0627\u0644\u0639\u0627\u062f\u064a\u0627\u062a",
+      "englishName": "Al-'Adiyat",
+      "ayahCount": 11,
+      "startPage": 599
+    },
+    {
+      "number": 101,
+      "name": "\u0627\u0644\u0642\u0627\u0631\u0639\u0629",
+      "englishName": "Al-Qari'ah",
+      "ayahCount": 11,
+      "startPage": 600
+    },
+    {
+      "number": 102,
+      "name": "\u0627\u0644\u062a\u0643\u0627\u062b\u0631",
+      "englishName": "At-Takathur",
+      "ayahCount": 8,
+      "startPage": 600
+    },
+    {
+      "number": 103,
+      "name": "\u0627\u0644\u0639\u0635\u0631",
+      "englishName": "Al-'Asr",
+      "ayahCount": 3,
+      "startPage": 601
+    },
+    {
+      "number": 104,
+      "name": "\u0627\u0644\u0647\u0645\u0632\u0629",
+      "englishName": "Al-Humazah",
+      "ayahCount": 9,
+      "startPage": 601
+    },
+    {
+      "number": 105,
+      "name": "\u0627\u0644\u0641\u064a\u0644",
+      "englishName": "Al-Fil",
+      "ayahCount": 5,
+      "startPage": 601
+    },
+    {
+      "number": 106,
+      "name": "\u0642\u0631\u064a\u0634",
+      "englishName": "Quraysh",
+      "ayahCount": 4,
+      "startPage": 602
+    },
+    {
+      "number": 107,
+      "name": "\u0627\u0644\u0645\u0627\u0639\u0648\u0646",
+      "englishName": "Al-Ma'un",
+      "ayahCount": 7,
+      "startPage": 602
+    },
+    {
+      "number": 108,
+      "name": "\u0627\u0644\u0643\u0648\u062b\u0631",
+      "englishName": "Al-Kawthar",
+      "ayahCount": 3,
+      "startPage": 602
+    },
+    {
+      "number": 109,
+      "name": "\u0627\u0644\u0643\u0627\u0641\u0631\u0648\u0646",
+      "englishName": "Al-Kafirun",
+      "ayahCount": 6,
+      "startPage": 603
+    },
+    {
+      "number": 110,
+      "name": "\u0627\u0644\u0646\u0635\u0631",
+      "englishName": "An-Nasr",
+      "ayahCount": 3,
+      "startPage": 603
+    },
+    {
+      "number": 111,
+      "name": "\u0627\u0644\u0645\u0633\u062f",
+      "englishName": "Al-Masad",
+      "ayahCount": 5,
+      "startPage": 603
+    },
+    {
+      "number": 112,
+      "name": "\u0627\u0644\u0625\u062e\u0644\u0627\u0635",
+      "englishName": "Al-Ikhlas",
+      "ayahCount": 4,
+      "startPage": 604
+    },
+    {
+      "number": 113,
+      "name": "\u0627\u0644\u0641\u0644\u0642",
+      "englishName": "Al-Falaq",
+      "ayahCount": 5,
+      "startPage": 604
+    },
+    {
+      "number": 114,
+      "name": "\u0627\u0644\u0646\u0627\u0633",
+      "englishName": "An-Nas",
+      "ayahCount": 6,
+      "startPage": 604
+    }
+  ]
+}
