@@ -13,7 +13,7 @@ final class MushafPageUIView: UIView {
     var pageFont: CTFont? { didSet { rebuildLayout() } }
     var highlightedWord: WordLocation? { didSet { setNeedsDisplay() } }
     var highlightedAyah: AyahRef? { didSet { setNeedsDisplay() } }
-    var theme: MushafTheme = .light { didSet { setNeedsDisplay() } }
+    var theme: MushafTheme = .standard { didSet { setNeedsDisplay() } }
     var centeredPage: Bool = false { didSet { rebuildLayout() } }
     var onWordTapped: ((WordLocation) -> Void)?
 
@@ -65,7 +65,7 @@ final class MushafPageUIView: UIView {
     private var lineLayouts: [LineLayout] = []
 
     /// Horizontal inset to prevent glyph clipping at view edges.
-    private static let horizontalInset: CGFloat = 6
+    private static let horizontalInset: CGFloat = 0
 
     // MARK: - Rebuild Layout
 
@@ -219,7 +219,7 @@ final class MushafPageUIView: UIView {
 
         let attrStr = NSAttributedString(string: basmalaText, attributes: [
             .font: basmalaFont as UIFont,
-            .foregroundColor: UIColor(theme.textColor)
+            NSAttributedString.Key(kCTForegroundColorFromContextAttributeName as String): true
         ])
         let ctLine = CTLineCreateWithAttributedString(attrStr)
         let lineWidth = CGFloat(CTLineGetTypographicBounds(ctLine, nil, nil, nil))
@@ -264,7 +264,6 @@ final class MushafPageUIView: UIView {
 
         let totalWordsWidth = wordGlyphs.reduce(0) { $0 + $1.totalAdvance }
         let gapCount = max(words.count - 1, 0)
-        let fillRatio = availableWidth > 0 ? totalWordsWidth / availableWidth : 1
 
         let interWordSpacing: CGFloat
         let lineStartX: CGFloat
@@ -276,7 +275,7 @@ final class MushafPageUIView: UIView {
             lineStartX = 0
         } else {
             // Centered pages or short lines (1-2 words): center with natural spacing
-            let naturalWordGap = fontSize * 0.25
+            let naturalWordGap = fontSize * 0
             interWordSpacing = naturalWordGap
             let totalLineWidth = totalWordsWidth + naturalWordGap * CGFloat(gapCount)
             lineStartX = max((availableWidth - totalLineWidth) / 2, 0)
@@ -330,8 +329,8 @@ final class MushafPageUIView: UIView {
 
                 if shouldHighlightWord || shouldHighlightAyah {
                     let color = shouldHighlightWord
-                        ? UIColor(theme.highlightColor).withAlphaComponent(0.5)
-                        : UIColor(theme.highlightColor)
+                        ? UIColor(theme.highlightColor).resolvedColor(with: traitCollection).withAlphaComponent(0.5)
+                        : UIColor(theme.highlightColor).resolvedColor(with: traitCollection)
                     ctx.setFillColor(color.cgColor)
                     let flippedRect = CGRect(
                         x: wordLayout.rect.origin.x,
@@ -349,12 +348,13 @@ final class MushafPageUIView: UIView {
             switch lineLayout.renderMode {
             case .ctLine(let ctLine):
                 let flippedY = bounds.height - lineLayout.origin.y
+                ctx.setFillColor(UIColor(theme.textColor).resolvedColor(with: traitCollection).cgColor)
                 ctx.textPosition = CGPoint(x: lineLayout.origin.x, y: flippedY)
                 CTLineDraw(ctLine, ctx)
 
             case .surahHeader(let glyph, let headerFont):
                 let flippedBaselineY = bounds.height - lineLayout.origin.y
-                ctx.setFillColor(UIColor(theme.textColor).cgColor)
+                ctx.setFillColor(UIColor(theme.textColor).resolvedColor(with: traitCollection).cgColor)
                 if let glyphPath = CTFontCreatePathForGlyph(headerFont, glyph, nil) {
                     var transform = CGAffineTransform(translationX: lineLayout.origin.x, y: flippedBaselineY)
                     if let movedPath = glyphPath.copy(using: &transform) {
@@ -367,7 +367,7 @@ final class MushafPageUIView: UIView {
                 guard let font = pageFont else { break }
 
                 let flippedBaselineY = bounds.height - lineLayout.origin.y
-                ctx.setFillColor(UIColor(theme.textColor).cgColor)
+                ctx.setFillColor(UIColor(theme.textColor).resolvedColor(with: traitCollection).cgColor)
 
                 for (wordIdx, glyphData) in lineLayout.wordGlyphData.enumerated() {
                     let wordX = wordIdx < lineLayout.words.count

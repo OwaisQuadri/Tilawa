@@ -18,20 +18,17 @@ struct MushafView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .environment(\.layoutDirection, .rightToLeft)
             .ignoresSafeArea(.container, edges: .bottom)
-            .onChange(of: mushafVM.currentPage) { _, newPage in
+            .onChange(of: mushafVM.currentPage, initial: true) { _, newPage in
                 mushafVM.onPageChanged(to: newPage)
             }
+            .toolbarTitleDisplayMode(.inline)
+            .ignoresSafeArea()
             .toolbar {
-                ToolbarItem(placement: .principal) {
+                ToolbarItem(placement: .title) {
                     MushafHeaderView()
+                        .environment(\.layoutDirection, .leftToRight)
                 }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button {
-                        vm.showJumpSheet = true
-                    } label: {
-                        Image(systemName: "text.magnifyingglass")
-                    }
-                }
+
             }
             .sheet(isPresented: $vm.showJumpSheet) {
                 JumpToAyahSheet()

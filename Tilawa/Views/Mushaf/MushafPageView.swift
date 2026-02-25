@@ -15,7 +15,7 @@ struct MushafPageView: View {
 
     /// Pages where text uses natural spacing (centered) instead of full-width justification.
     /// First 2 pages (Al-Fatiha) and last 10 pages (short surahs in Juz 30).
-    private static let centeredPages: Set<Int> = Set(1...2).union(Set(595...604))
+    private static let centeredPages: Set<Int> = Set(1...2).union(Set(600...604))
 
     var body: some View {
         Group {
@@ -58,7 +58,7 @@ private struct PageSideIndicator: View {
     let isTrailing: Bool
     let color: Color
     let lineWidth: CGFloat = 2.0
-    let gradientWidth = 8.0
+    let gradientWidth = 2.0
 
     var gradientColor: Color {
         color.opacity(0.5)

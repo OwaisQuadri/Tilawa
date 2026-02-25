@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Root tab-based navigation for the app.
 struct RootView: View {
+    @Environment(MushafViewModel.self) private var mushafVM
+
     var body: some View {
         TabView {
             Tab("Mushaf", systemImage: "book") {

@@ -32,6 +32,9 @@ struct MushafHeaderView: View {
     }
 
     var body: some View {
+        Button {
+            mushafVM.showJumpSheet = true
+        } label: {
         VStack(spacing: 1) {
             // Row 1: surah number · Arabic name · English name · ayah range
             HStack(spacing: 4) {
@@ -46,10 +49,13 @@ struct MushafHeaderView: View {
                             .foregroundStyle(.secondary)
                         Text(range)
                             .foregroundStyle(.secondary)
+                            .layoutPriority(-1)
+                            .truncationMode(.tail)
                     }
                 }
             }
             .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
 
             // Row 2: page · Juz · Hizb (· thumun fraction if not start of hizb)
             // Section is bolded when the current page opens on a thumun boundary
@@ -70,6 +76,11 @@ struct MushafHeaderView: View {
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            .lineLimit(1)
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        }
+        .buttonStyle(.glass)
     }
 }

@@ -6,7 +6,7 @@ import UIKit
 final class QuranFontProvider: @unchecked Sendable {
     static let shared = QuranFontProvider()
 
-    static let maxFontSize = 22.0
+    static let maxFontSize = 23.0
     static let minFontSize = 16.0
 
     private let hafsFontName: String
