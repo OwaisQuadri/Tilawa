@@ -13,7 +13,7 @@ struct AyahPickerView: View {
     var body: some View {
         Picker("Ayah", selection: $selection) {
             ForEach(1...max(1, ayahCount), id: \.self) { ayah in
-                Text("Ayah \(ayah)")
+                Text("\(ayah)")
                     .tag(ayah)
             }
         }
