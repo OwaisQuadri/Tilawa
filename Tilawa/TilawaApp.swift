@@ -1,18 +1,14 @@
-//
-//  TilawaApp.swift
-//  Tilawa
-//
-//  Created by Owais Quadri on 2026-02-24.
-//
-
 import SwiftUI
 import SwiftData
 
 @main
 struct TilawaApp: App {
+    @State private var mushafViewModel = MushafViewModel()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            UserBookmark.self,
+            ListeningSession.self,
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 
@@ -25,7 +21,8 @@ struct TilawaApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(mushafViewModel)
         }
         .modelContainer(sharedModelContainer)
     }
