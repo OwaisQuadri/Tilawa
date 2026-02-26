@@ -77,16 +77,7 @@ final class MushafViewModel {
     // MARK: - Word Tap Handling
 
     func handleWordTap(_ wordLocation: MushafPageUIView.WordLocation) {
-        if highlightedWord == wordLocation {
-            // Deselect on second tap
-            highlightedWord = nil
-            highlightedAyah = nil
-            highlightedAyahPage = nil
-        } else {
-            highlightedWord = wordLocation
-            highlightedAyah = wordLocation.ayahRef
-            highlightedAyahPage = wordLocation.pageNumber  // exact page from the tap
-        }
+        // Intentionally no-op: tapping words should not highlight anything
     }
 
     // MARK: - Page-Scoped Highlight Queries
