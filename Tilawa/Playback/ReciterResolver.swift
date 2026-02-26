@@ -23,7 +23,11 @@ final class ReciterResolver {
 
     func resolve(ref: AyahRef,
                  snapshot: PlaybackSettingsSnapshot) async -> AyahAudioItem? {
-        for entry in snapshot.reciterPriority {
+        // Check if a segment override covers this ayah; use its priority list if so
+        let matchingOverride = snapshot.segmentOverrides.first { $0.range.contains(ref) }
+        let priorityList = matchingOverride.map(\.reciterPriority) ?? snapshot.reciterPriority
+
+        for entry in priorityList {
             let reciter = entry.reciter
 
             // Build unified source priority list

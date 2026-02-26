@@ -41,6 +41,10 @@ final class PlaybackSettings {
     @Relationship(deleteRule: .cascade)
     var reciterPriority: [ReciterPriorityEntry]?
 
+    // --- Segment Overrides ---
+    @Relationship(deleteRule: .cascade)
+    var segmentOverrides: [ReciterSegmentOverride]?
+
     // --- Display ---
     var showRepetitionCounter: Bool?
     var showReciterName: Bool?
@@ -59,6 +63,7 @@ final class PlaybackSettings {
         self.selectedRiwayah = nil
         self.selectedReciterId = nil
         self.reciterPriority = nil
+        self.segmentOverrides = nil
         self.showRepetitionCounter = nil; self.showReciterName = nil
     }
 

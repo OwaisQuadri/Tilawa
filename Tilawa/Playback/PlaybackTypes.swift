@@ -34,6 +34,7 @@ struct PlaybackSettingsSnapshot: Sendable {
     let afterRepeatContinuePagesCount: Int
     let gapBetweenAyaatMs: Int
     let reciterPriority: [ReciterSnapshot]
+    let segmentOverrides: [SegmentOverrideSnapshot]
     let riwayah: Riwayah
 }
 
@@ -41,6 +42,12 @@ struct PlaybackSettingsSnapshot: Sendable {
 struct ReciterSnapshot: Sendable {
     let reciterId: UUID
     let reciter: Reciter
+}
+
+/// Snapshot of a segment-specific reciter priority override captured at play() time.
+struct SegmentOverrideSnapshot: Sendable {
+    let range: AyahRange
+    let reciterPriority: [ReciterSnapshot]
 }
 
 // MARK: - Word timing (retained for future use, not used by engine in this version)
