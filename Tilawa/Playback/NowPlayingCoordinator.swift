@@ -18,8 +18,17 @@ final class NowPlayingCoordinator {
                 elapsed: TimeInterval) {
 
         let surahName = metadata.surahName(item.ayahRef.surah)
-        // Each ayah is its own track: "Al-Fatiha - 1", "Al-Fatiha - 2", etc.
-        let trackTitle = "\(surahName) - \(item.ayahRef.ayah)"
+        let trackTitle: String
+        if item.coversRange {
+            if item.endAyahRef.surah == item.ayahRef.surah {
+                trackTitle = "\(surahName) - \(item.ayahRef.ayah)–\(item.endAyahRef.ayah)"
+            } else {
+                let endSurahName = metadata.surahName(item.endAyahRef.surah)
+                trackTitle = "\(surahName) \(item.ayahRef.ayah) – \(endSurahName) \(item.endAyahRef.ayah)"
+            }
+        } else {
+            trackTitle = "\(surahName) - \(item.ayahRef.ayah)"
+        }
 
         let repLabel: String
         if totalRangeRep == -1 {

@@ -19,6 +19,15 @@ final class Reciter {
     var coverImageURL: String?
     var sortOrder: Int?
     var style: String?               // "murattal" | "mujawwad" | "muallim" (optional display only)
+    /// Full URL template used when namingPatternType == "url_template".
+    /// Tokens: ${s}/${ss}/${sss} (surah), ${a}/${aa}/${aaa} (ayah).
+    var audioURLTemplate: String?
+    /// Priority position of the CDN manifest source (remoteBaseURL) in the unified source list.
+    /// nil = ordered after all explicitly-positioned items.
+    var cdnManifestOrder: Int?
+    /// Priority position of the CDN url-template source (audioURLTemplate) in the unified source list.
+    /// nil = ordered after all explicitly-positioned items.
+    var cdnTemplateOrder: Int?
 
     @Relationship(deleteRule: .cascade)
     var recordings: [Recording]?
@@ -32,6 +41,9 @@ final class Reciter {
         self.audioFileFormat = nil; self.namingPatternType = nil
         self.isDownloaded = nil; self.downloadedSurahsJSON = nil
         self.coverImageURL = nil; self.sortOrder = nil; self.style = nil
+        self.audioURLTemplate = nil
+        self.cdnManifestOrder = nil
+        self.cdnTemplateOrder = nil
         self.recordings = nil
     }
 
@@ -52,7 +64,7 @@ final class Reciter {
     var namingPattern: ReciterNamingPattern {
         ReciterNamingPattern(rawValue: namingPatternType ?? "") ?? .surahAyah
     }
-    var hasCDN: Bool { remoteBaseURL != nil }
+    var hasCDN: Bool { remoteBaseURL != nil || audioURLTemplate != nil }
     var hasPersonalRecordings: Bool { !(recordings ?? []).isEmpty }
 
     var downloadedSurahs: [Int] {
