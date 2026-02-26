@@ -133,18 +133,11 @@ struct AnnotationEditorView: View {
                             .frame(width: waveformContentWidth)
                             Color.clear.frame(width: halfScreen, height: 120)
                         }
-                        .background(
-                            GeometryReader { geo in
-                                Color.clear.preference(
-                                    key: WaveformScrollOffsetKey.self,
-                                    value: -geo.frame(in: .named("waveformScroll")).minX
-                                )
-                            }
-                        )
                     }
                     .scrollPosition($waveformScrollPosition)
-                    .coordinateSpace(name: "waveformScroll")
-                    .onPreferenceChange(WaveformScrollOffsetKey.self) { offset in
+                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
+                        geometry.contentOffset.x
+                    } action: { _, offset in
                         guard !vm.isPreviewPlaying, waveformContentWidth > 0 else { return }
                         let ratio = max(0, min(1.0, offset / waveformContentWidth))
                         vm.seekPreview(to: ratio * recording.safeDuration)
@@ -506,7 +499,3 @@ enum EditorTab: String, CaseIterable {
     case ayahPlayer = "Ayah Player"
 }
 
-private struct WaveformScrollOffsetKey: PreferenceKey {
-    static var defaultValue: CGFloat = 0
-    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = nextValue() }
-}
