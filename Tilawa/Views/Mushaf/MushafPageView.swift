@@ -24,13 +24,18 @@ struct MushafPageView: View {
     private var activeHighlightedAyah: AyahRef? {
         if let ayah = playbackVM.currentAyah, let layout = pageLayout {
             let words = layout.lines.compactMap(\.words).flatMap { $0 }
-            if let first = words.first?.ayahRef, let last = words.last?.ayahRef,
-               RubService.ayah(ayah, isBetween: first, and: last) {
-                return ayah
-            }
-            return nil  // playing, but this ayah is on a different page
+            guard let first = words.first?.ayahRef, let last = words.last?.ayahRef else { return nil }
+            let end = playbackVM.currentAyahEnd ?? ayah
+            // Highlight if the ayah range overlaps this page's range
+            if ayah <= last && end >= first { return ayah }
+            return nil  // playing, but this range doesn't touch this page
         }
         return mushafVM.highlightedAyahOnPage(pageNumber)
+    }
+
+    private var activeHighlightedAyahEnd: AyahRef? {
+        guard playbackVM.currentAyah != nil else { return nil }
+        return playbackVM.currentAyahEnd
     }
 
     var body: some View {
@@ -41,9 +46,11 @@ struct MushafPageView: View {
                     font: mushafVM.font(forPage: pageNumber),
                     highlightedWord: mushafVM.highlightedWordOnPage(pageNumber),
                     highlightedAyah: activeHighlightedAyah,
+                    highlightedAyahEnd: activeHighlightedAyahEnd,
                     theme: mushafVM.theme,
                     centeredPage: Self.centeredPages.contains(pageNumber),
-                    onWordTapped: { mushafVM.handleWordTap($0) }
+                    onWordTapped: { mushafVM.handleWordTap($0) },
+                    onWordLongPressed: { mushafVM.handleWordLongPress($0) }
                 )
                 .aspectRatio(Self.pageAspectRatio, contentMode: .fit)
                 .padding(.horizontal, 16)

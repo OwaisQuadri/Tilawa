@@ -8,6 +8,7 @@ final class PlaybackEngine {
 
     private(set) var state: PlaybackState = .idle
     private(set) var currentAyah: AyahRef?
+    private(set) var currentAyahEnd: AyahRef?   // end of the currently playing ayah range
     private(set) var currentAyahRepetition: Int = 0       // 1-based
     private(set) var totalAyahRepetitions: Int = 1        // -1 = infinite
     private(set) var currentRangeRepetition: Int = 0      // 1-based
@@ -22,6 +23,7 @@ final class PlaybackEngine {
     private let audioEngine = AVAudioEngine()
     private let playerNode = AVAudioPlayerNode()
     private let timePitchUnit = AVAudioUnitTimePitch()
+    private let eqNode = AVAudioUnitEQ(numberOfBands: 3)
 
     // MARK: - Dependencies
 
@@ -111,6 +113,7 @@ final class PlaybackEngine {
         playerNode.stop()
         state = .idle
         currentAyah = nil
+        currentAyahEnd = nil
         currentItem = nil
         activeSnapshot = nil
         ayahQueue = []
@@ -176,13 +179,25 @@ final class PlaybackEngine {
     private func setupAudioEngine() {
         let session = AVAudioSession.sharedInstance()
         try? session.setCategory(.playback, mode: .default,
-                                  options: [.allowBluetooth, .allowAirPlay])
+                                  options: [.allowBluetoothA2DP, .allowAirPlay])
         try? session.setActive(true)
+
+        if audioEngine.isRunning { audioEngine.stop() }
+
+        // EQ: voice isolation (high-pass rumble cut, presence boost, hiss shelf cut)
+        let bands = eqNode.bands
+        bands[0].filterType = .highPass;   bands[0].frequency = 100;  bands[0].bypass = false
+        bands[1].filterType = .parametric; bands[1].frequency = 3000; bands[1].bandwidth = 1.0
+        bands[1].gain = 2.5; bands[1].bypass = false
+        bands[2].filterType = .highShelf;  bands[2].frequency = 8000; bands[2].gain = -2.5
+        bands[2].bypass = false
 
         audioEngine.attach(playerNode)
         audioEngine.attach(timePitchUnit)
+        audioEngine.attach(eqNode)
         audioEngine.connect(playerNode, to: timePitchUnit, format: nil)
-        audioEngine.connect(timePitchUnit, to: audioEngine.mainMixerNode, format: nil)
+        audioEngine.connect(timePitchUnit, to: eqNode, format: nil)
+        audioEngine.connect(eqNode, to: audioEngine.mainMixerNode, format: nil)
 
         do {
             try audioEngine.start()
@@ -227,6 +242,7 @@ final class PlaybackEngine {
         await MainActor.run {
             unavailableAyah = nil
             currentItem = item
+            currentAyahEnd = item.endAyahRef
             currentReciterName = item.reciterName
             currentIsPersonalRecording = item.isPersonalRecording
             currentAyahRepetition = (currentAyahRepetition == 0) ? 1 : currentAyahRepetition
@@ -273,6 +289,10 @@ final class PlaybackEngine {
             return
         }
 
+        let isPersonal = item.isPersonalRecording
+        eqNode.auAudioUnit.shouldBypassEffect = !isPersonal
+        playerNode.volume = normalizedVolume(for: audioFile, startFrame: startFrame, frameCount: frameCount, isPersonal: isPersonal)
+
         playerNode.scheduleSegment(
             audioFile,
             startingFrame: startFrame,
@@ -282,6 +302,58 @@ final class PlaybackEngine {
         ) { _ in
             Task { @MainActor in completionHandler() }
         }
+    }
+
+    /// Computes a volume gain to bring the segment's RMS level close to -18 dBFS.
+    /// Personal recordings: samples 3 windows (10 / 50 / 90 %) for a representative estimate.
+    /// CDN: quick single-window at the start.
+    private func normalizedVolume(for audioFile: AVAudioFile,
+                                   startFrame: AVAudioFramePosition,
+                                   frameCount: AVAudioFrameCount,
+                                   isPersonal: Bool) -> Float {
+        let format = audioFile.processingFormat
+        let sampleRate = Float(format.sampleRate)
+        let channels = Int(format.channelCount)
+        var sumSquares: Float = 0
+        var totalSamples: Int = 0
+
+        func accumulate(from windowStart: AVAudioFramePosition, windowFrames: AVAudioFrameCount) {
+            let available = AVAudioFrameCount(max(0, Int64(frameCount) - (windowStart - startFrame)))
+            let count = min(windowFrames, available)
+            guard count > 0,
+                  let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: count) else { return }
+            audioFile.framePosition = windowStart
+            guard (try? audioFile.read(into: buffer, frameCount: count)) != nil,
+                  buffer.frameLength > 0,
+                  let channelData = buffer.floatChannelData else { return }
+            let length = Int(buffer.frameLength)
+            for ch in 0..<channels {
+                let samples = channelData[ch]
+                for i in 0..<length { sumSquares += samples[i] * samples[i] }
+            }
+            totalSamples += length * channels
+        }
+
+        let windowFrames = AVAudioFrameCount(sampleRate * 0.5)   // 0.5 s per window
+
+        if isPersonal {
+            // 3 windows at 10 %, 50 %, 90 % of the segment
+            for ratio: Float in [0.1, 0.5, 0.9] {
+                let offset = AVAudioFramePosition(Float(frameCount) * ratio)
+                accumulate(from: startFrame + offset, windowFrames: windowFrames)
+            }
+        } else {
+            // CDN: one window at the start
+            accumulate(from: startFrame, windowFrames: min(AVAudioFrameCount(sampleRate), frameCount))
+        }
+
+        guard totalSamples > 0 else { return 1.0 }
+        let rms = sqrtf(sumSquares / Float(totalSamples))
+        guard rms > 0.0001 else { return 1.0 }   // near-silence; don't adjust
+
+        // Target ~-18 dBFS (≈ 0.126 RMS). Clamp to ±12 dB.
+        let gain = 0.126 / rms
+        return min(max(gain, 0.25), 4.0)
     }
 
     private func scheduleSilenceGap(durationMs: Int) {
@@ -323,7 +395,13 @@ final class PlaybackEngine {
         state = .awaitingNextAyah
         currentAyahRepetition = 1
 
-        let nextIndex = currentQueueIndex + 1
+        // Skip any queue entries already covered by the just-played item's ayah range
+        var nextIndex = currentQueueIndex + 1
+        if let item = currentItem, item.coversRange {
+            while nextIndex < ayahQueue.count && ayahQueue[nextIndex] <= item.endAyahRef {
+                nextIndex += 1
+            }
+        }
 
         if nextIndex < ayahQueue.count {
             // More ayaat in the current range pass
@@ -477,6 +555,9 @@ final class PlaybackEngine {
         case .oldDeviceUnavailable:
             // Headphones unplugged — pause per Apple HIG
             pause()
+        case .newDeviceAvailable:
+            // A new audio output (e.g. AirPods) connected — restart engine so it routes to it
+            setupAudioEngine()
         default:
             break
         }

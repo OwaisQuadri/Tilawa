@@ -95,6 +95,17 @@ struct PlaybackSetupSheet: View {
                         .font(.caption)
                         .foregroundStyle(.red)
                 }
+
+                // Auto priority link (shown when Auto is selected)
+                if s.selectedReciterId == nil {
+                    NavigationLink {
+                        ReciterPriorityView()
+                    } label: {
+                        Label("Manage Auto Priority", systemImage: "arrow.up.arrow.down.circle")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
         }
     }
@@ -277,6 +288,13 @@ struct PlaybackSetupSheet: View {
     // MARK: - Helpers
 
     private func initializeRange() {
+        // Long-press "Play Ayah" — seed range to exactly that one ayah, then consume
+        if let ayah = mushafVM.longPressedAyahRef {
+            startSurah = ayah.surah;  startAyah = ayah.ayah
+            endSurah   = ayah.surah;  endAyah   = ayah.ayah
+            mushafVM.longPressedAyahRef = nil
+            return
+        }
         let page = mushafVM.currentPage
         if let r = mushafVM.currentPageAyahRange {
             startSurah = r.first.surah;  startAyah = r.first.ayah

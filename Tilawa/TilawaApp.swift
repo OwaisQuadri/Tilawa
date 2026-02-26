@@ -4,9 +4,15 @@ import SwiftData
 @main
 struct TilawaApp: App {
     @State private var mushafViewModel = MushafViewModel()
-    @State private var playbackViewModel = PlaybackViewModel(engine: PlaybackEngine())
+    @State private var playbackViewModel = PlaybackViewModel(
+        engine: PlaybackEngine(
+            resolver: ReciterResolver(
+                libraryService: RecordingLibraryServiceImpl(container: TilawaApp.sharedModelContainer)
+            )
+        )
+    )
 
-    var sharedModelContainer: ModelContainer = {
+    static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             PlaybackSettings.self,
             ReciterPriorityEntry.self,
@@ -34,8 +40,9 @@ struct TilawaApp: App {
             RootView()
                 .environment(mushafViewModel)
                 .environment(playbackViewModel)
-                .modelContainer(sharedModelContainer)
+                .modelContainer(TilawaApp.sharedModelContainer)
                 .task { await seedDefaultReciterIfNeeded() }
+                .task { DownloadManager.shared.requestNotificationPermission() }
         }
     }
 
@@ -45,7 +52,7 @@ struct TilawaApp: App {
     /// Also patches any stale base URLs that were saved before the CDN folder name was corrected.
     @MainActor
     private func seedDefaultReciterIfNeeded() async {
-        let context = sharedModelContainer.mainContext
+        let context = TilawaApp.sharedModelContainer.mainContext
         let descriptor = FetchDescriptor<Reciter>()
         let existing = (try? context.fetch(descriptor)) ?? []
 

@@ -26,6 +26,17 @@ struct MushafView: View {
             .onChange(of: mushafVM.currentPage, initial: true) { _, newPage in
                 mushafVM.onPageChanged(to: newPage)
             }
+            .task(id: mushafVM.currentPage) {
+                let center = mushafVM.currentPage
+                await withTaskGroup(of: Void.self) { group in
+                    for p in max(1, center - 3)...min(604, center + 3) {
+                        let page = p
+                        group.addTask {
+                            _ = try? await PageLayoutProvider.shared.layout(for: page)
+                        }
+                    }
+                }
+            }
             .onChange(of: currentAyah) { _, newAyah in
                 // Highlighting is handled directly inside MushafPageView via playbackVM.currentAyah.
                 // This handler only drives page navigation.
@@ -54,6 +65,10 @@ struct MushafView: View {
             }
             .sheet(isPresented: $showPlaybackSetup) {
                 PlaybackSetupSheet()
+            }
+            .alert(vm.longPressedAyahTitle, isPresented: $vm.showAyahContextMenu) {
+                Button("Play Ayah") { showPlaybackSetup = true }
+                Button("Cancel", role: .cancel) {}
             }
         }
     }

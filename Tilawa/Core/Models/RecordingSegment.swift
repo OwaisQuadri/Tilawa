@@ -24,6 +24,10 @@ final class RecordingSegment {
     var isManuallyAnnotated: Bool?
     var confidenceScore: Double?  // 0.0–1.0
 
+    // --- User-defined priority ---
+    var userSortOrder: Int?  // explicit priority among competing segments for same ayah+riwayah.
+                             // Lower value = higher priority. nil = unset (falls back to importedAt).
+
     // MARK: - Nil initializer (required for CloudKit)
     init() {
         self.id = nil
@@ -33,6 +37,7 @@ final class RecordingSegment {
         self.endSurahNumber = nil; self.endAyahNumber = nil
         self.isCrosssurahSegment = nil; self.crossSurahJoinOffsetSeconds = nil
         self.isManuallyAnnotated = nil; self.confidenceScore = nil
+        self.userSortOrder = nil
     }
 
     // MARK: - Convenience initializer

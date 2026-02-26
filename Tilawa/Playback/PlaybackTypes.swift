@@ -6,13 +6,16 @@ import Foundation
 /// Supports both full-file CDN audio (startOffset = 0) and UGC sub-file segments.
 struct AyahAudioItem: Identifiable, Sendable {
     let id: UUID
-    let ayahRef: AyahRef
+    let ayahRef: AyahRef        // start of the covered ayah range
+    let endAyahRef: AyahRef     // end of range (== ayahRef for single-ayah CDN items)
     let audioURL: URL
     let startOffset: TimeInterval   // 0 for full CDN files; >0 for UGC segments
     let endOffset: TimeInterval
     let reciterName: String
     let reciterId: UUID
     let isPersonalRecording: Bool
+
+    var coversRange: Bool { endAyahRef != ayahRef }
 }
 
 // MARK: - Immutable settings snapshot

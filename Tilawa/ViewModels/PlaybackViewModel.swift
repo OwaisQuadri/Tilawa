@@ -1,4 +1,5 @@
 import Observation
+import Foundation
 import SwiftData
 
 /// Thin @Observable wrapper around PlaybackEngine.
@@ -13,6 +14,7 @@ final class PlaybackViewModel {
 
     var state: PlaybackState { engine.state }
     var currentAyah: AyahRef? { engine.currentAyah }
+    var currentAyahEnd: AyahRef? { engine.currentAyahEnd }
     var currentReciterName: String { engine.currentReciterName }
     var currentAyahRepetition: Int { engine.currentAyahRepetition }
     var totalAyahRepetitions: Int { engine.totalAyahRepetitions }
@@ -26,6 +28,13 @@ final class PlaybackViewModel {
     /// "Al-Fatiha - 1" style title for the current ayah, or empty string.
     var currentTrackTitle: String {
         guard let ayah = currentAyah else { return "" }
+        if let end = currentAyahEnd, end != ayah {
+            if end.surah == ayah.surah {
+                return "\(metadata.surahName(ayah.surah)) - \(ayah.ayah)–\(end.ayah)"
+            } else {
+                return "\(metadata.surahName(ayah.surah)) \(ayah.ayah) – \(metadata.surahName(end.surah)) \(end.ayah)"
+            }
+        }
         return "\(metadata.surahName(ayah.surah)) - \(ayah.ayah)"
     }
 
@@ -36,13 +45,34 @@ final class PlaybackViewModel {
         self.metadata = metadata
     }
 
-    // MARK: - Convenience play method
+    // MARK: - Convenience play methods
 
     /// Builds a PlaybackSettingsSnapshot from a PlaybackSettings @Model and starts playback.
     func play(range: AyahRange,
               settings: PlaybackSettings,
               context: ModelContext) async {
         let snapshot = buildSnapshot(range: range, settings: settings, context: context)
+        await engine.play(range: range, settings: snapshot)
+    }
+
+    /// Plays a recording's ayah range with no repeats and stop-after behavior.
+    /// Does NOT modify the user's persisted PlaybackSettings.
+    func playRecording(range: AyahRange, recording: Recording) async {
+        guard let reciter = recording.reciter else { return }
+        let snapshot = PlaybackSettingsSnapshot(
+            range: range,
+            connectionAyahBefore: 0,
+            connectionAyahAfter: 0,
+            speed: 1.0,
+            ayahRepeatCount: 1,
+            rangeRepeatCount: 1,
+            afterRepeatAction: .stop,
+            afterRepeatContinueAyaatCount: 0,
+            afterRepeatContinuePagesCount: 0,
+            gapBetweenAyaatMs: 0,
+            reciterPriority: [ReciterSnapshot(reciterId: reciter.id ?? UUID(), reciter: reciter)],
+            riwayah: recording.safeRiwayah
+        )
         await engine.play(range: range, settings: snapshot)
     }
 

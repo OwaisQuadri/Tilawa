@@ -74,10 +74,24 @@ final class MushafViewModel {
         }
     }
 
-    // MARK: - Word Tap Handling
+    // MARK: - Word Tap / Long-Press Handling
 
     func handleWordTap(_ wordLocation: MushafPageUIView.WordLocation) {
         // Intentionally no-op: tapping words should not highlight anything
+    }
+
+    /// Set when the user long-presses an ayah — used to pre-seed PlaybackSetupSheet.
+    var longPressedAyahRef: AyahRef? = nil
+    var showAyahContextMenu: Bool = false
+
+    var longPressedAyahTitle: String {
+        guard let ref = longPressedAyahRef else { return "" }
+        return "\(metadata.surahName(ref.surah)) \(ref.surah):\(ref.ayah)"
+    }
+
+    func handleWordLongPress(_ wordLocation: MushafPageUIView.WordLocation) {
+        longPressedAyahRef = wordLocation.ayahRef
+        showAyahContextMenu = true
     }
 
     // MARK: - Page-Scoped Highlight Queries

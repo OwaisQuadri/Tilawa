@@ -13,6 +13,9 @@ final class AyahMarker {
     var isConfirmed: Bool?        // true once ayah is assigned
     var assignedSurah: Int?
     var assignedAyah: Int?
+    var assignedEndSurah: Int?   // optional end of ayah range (for multi-ayah segments)
+    var assignedEndAyah: Int?
+    var endPositionSeconds: Double?  // explicit end time; if nil, next marker's start is used
 
     // MARK: - Nil initializer (required for CloudKit)
     init() {
@@ -21,6 +24,8 @@ final class AyahMarker {
         self.positionSeconds = nil; self.markerIndex = nil
         self.isConfirmed = nil
         self.assignedSurah = nil; self.assignedAyah = nil
+        self.assignedEndSurah = nil; self.assignedEndAyah = nil
+        self.endPositionSeconds = nil
     }
 
     // MARK: - Convenience initializer

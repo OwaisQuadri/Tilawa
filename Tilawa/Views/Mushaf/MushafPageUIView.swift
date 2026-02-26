@@ -13,6 +13,7 @@ final class MushafPageUIView: UIView {
     var pageFont: CTFont? { didSet { rebuildLayout() } }
     var highlightedWord: WordLocation? { didSet { setNeedsDisplay() } }
     var highlightedAyah: AyahRef? { didSet { setNeedsDisplay() } }
+    var highlightedAyahEnd: AyahRef? { didSet { setNeedsDisplay() } }
     var theme: MushafTheme = .standard { didSet { setNeedsDisplay() } }
     var centeredPage: Bool = false { didSet { rebuildLayout() } }
     var onWordTapped: ((WordLocation) -> Void)?
@@ -325,8 +326,11 @@ final class MushafPageUIView: UIView {
                     $0.pageNumber == (pageLayout?.page ?? -1)
                     && wordLayout.word.location == $0.word.location
                 } ?? false
+                let wordRef = wordLayout.word.ayahRef
                 let shouldHighlightAyah = !shouldHighlightWord
-                    && highlightedAyah == wordLayout.word.ayahRef
+                    && highlightedAyah.map { start in
+                        wordRef >= start && wordRef <= (highlightedAyahEnd ?? start)
+                    } ?? false
 
                 if shouldHighlightWord || shouldHighlightAyah {
                     let color = shouldHighlightWord

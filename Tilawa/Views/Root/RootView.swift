@@ -12,8 +12,7 @@ struct RootView: View {
             }
 
             Tab("Library", systemImage: "waveform") {
-                Text("Recording Library")
-                    .foregroundStyle(.secondary)
+                LibraryView()
                     .miniPlayerInset()
             }
 

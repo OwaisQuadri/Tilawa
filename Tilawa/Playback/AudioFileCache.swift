@@ -21,6 +21,11 @@ actor AudioFileCache {
 
     /// Returns the remote CDN URL for an ayah, or nil if the reciter has no CDN configured.
     func remoteURL(for ref: AyahRef, reciter: Reciter) -> URL? {
+        if reciter.namingPattern == .urlTemplate {
+            guard let template = reciter.audioURLTemplate else { return nil }
+            let urlString = Self.substituteURLTemplate(template, surah: ref.surah, ayah: ref.ayah)
+            return URL(string: urlString)
+        }
         guard let base = reciter.remoteBaseURL,
               let baseURL = URL(string: base) else { return nil }
         let filename = audioFilename(for: ref, reciter: reciter)
@@ -179,7 +184,29 @@ actor AudioFileCache {
         case .sequential:
             let index = sequentialIndex(for: ref)
             return "\(index).\(format)"
+        case .urlTemplate:
+            // Use surahAyah format for local cache filenames regardless of remote URL structure.
+            let surah = String(format: "%03d", ref.surah)
+            let ayah  = String(format: "%03d", ref.ayah)
+            return "\(surah)\(ayah).\(format)"
         }
+    }
+
+    // MARK: - URL Template Substitution
+
+    /// Substitutes ${s}, ${ss}, ${sss} (surah) and ${a}, ${aa}, ${aaa} (ayah) tokens.
+    /// Longer tokens are replaced first to avoid partial matches (${sss} before ${ss} before ${s}).
+    static func substituteURLTemplate(_ template: String, surah: Int, ayah: Int) -> String {
+        var result = template
+        // Surah tokens (longest first)
+        result = result.replacingOccurrences(of: "${sss}", with: String(format: "%03d", surah))
+        result = result.replacingOccurrences(of: "${ss}",  with: String(format: "%02d", surah))
+        result = result.replacingOccurrences(of: "${s}",   with: "\(surah)")
+        // Ayah tokens (longest first)
+        result = result.replacingOccurrences(of: "${aaa}", with: String(format: "%03d", ayah))
+        result = result.replacingOccurrences(of: "${aa}",  with: String(format: "%02d", ayah))
+        result = result.replacingOccurrences(of: "${a}",   with: "\(ayah)")
+        return result
     }
 
     /// Computes the 1-based sequential ayah index (1–6236) across the whole Quran.
