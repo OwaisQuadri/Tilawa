@@ -63,6 +63,7 @@ final class MushafPageUIView: UIView {
     }
 
     private var lineLayouts: [LineLayout] = []
+    private var lastLayoutBounds: CGRect = .zero
 
     /// Horizontal inset to prevent glyph clipping at view edges.
     private static let horizontalInset: CGFloat = 0
@@ -429,6 +430,8 @@ final class MushafPageUIView: UIView {
 
     override func layoutSubviews() {
         super.layoutSubviews()
+        guard bounds != lastLayoutBounds else { return }
+        lastLayoutBounds = bounds
         rebuildLayout()
     }
 }

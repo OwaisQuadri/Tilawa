@@ -154,6 +154,28 @@ final class QuranFontProvider: @unchecked Sendable {
         String(format: "QCF_P%03d", page)
     }
 
+    /// Unregisters QCF fonts for pages outside the given range.
+    /// Call this alongside page layout eviction to bound font memory usage.
+    func unregisterQCFFonts(outside range: ClosedRange<Int>) {
+        lock.lock()
+        let toEvict = registeredQCFPages.filter { !range.contains($0) }
+        lock.unlock()
+        guard !toEvict.isEmpty else { return }
+
+        for page in toEvict {
+            let fileName = String(format: "QCF_P%03d", page)
+            if let url = Bundle.main.url(forResource: fileName, withExtension: "TTF")
+                ?? Bundle.main.url(forResource: fileName, withExtension: "ttf") {
+                var error: Unmanaged<CFError>?
+                CTFontManagerUnregisterFontsForURL(url as CFURL, .process, &error)
+            }
+            lock.lock()
+            registeredQCFPages.remove(page)
+            qcfPostScriptNames.removeValue(forKey: page)
+            lock.unlock()
+        }
+    }
+
     /// Create a CTFont for the surah name ligature font.
     func surahNameFont(size: CGFloat) -> CTFont {
         CTFontCreateWithName(surahNameFontName as CFString, size, nil)

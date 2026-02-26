@@ -117,12 +117,19 @@ final class MushafViewModel {
 
     // MARK: - Page Changed
 
+    private var pageChangeTask: Task<Void, Never>?
+
     func onPageChanged(to page: Int) {
         currentPage = page
-        Task {
-            await PageLayoutProvider.shared.evict(
-                outside: max(1, page - 5)...min(604, page + 5)
-            )
+        pageChangeTask?.cancel()
+        pageChangeTask = Task {
+            let layoutRange = max(1, page - 5)...min(604, page + 5)
+            let fontRange   = max(1, page - 15)...min(604, page + 15)
+
+            await PageLayoutProvider.shared.evict(outside: layoutRange)
+            fontProvider.unregisterQCFFonts(outside: fontRange)
+
+            guard !Task.isCancelled else { return }
             if let layout = try? await PageLayoutProvider.shared.layout(for: page) {
                 let words = layout.lines.compactMap(\.words).flatMap { $0 }
                 if let first = words.first?.ayahRef, let last = words.last?.ayahRef {
