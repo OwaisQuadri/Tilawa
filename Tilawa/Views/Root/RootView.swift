@@ -11,6 +11,11 @@ struct RootView: View {
                     .miniPlayerInset()
             }
 
+            Tab("Reciters", systemImage: "person.wave.2") {
+                RecitersView()
+                    .miniPlayerInset()
+            }
+
             Tab("Library", systemImage: "waveform") {
                 LibraryView()
                     .miniPlayerInset()

@@ -40,6 +40,7 @@ final class AnnotationEditorViewModel {
 
     init(recording: Recording) {
         self.recording = recording
+        self.previewDuration = recording.safeDuration
     }
 
     // MARK: - Waveform loading

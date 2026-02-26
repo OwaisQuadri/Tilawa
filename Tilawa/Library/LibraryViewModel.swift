@@ -9,7 +9,6 @@ final class LibraryViewModel {
 
     var isShowingAudioPicker = false
     var isShowingVideoPicker = false
-    var isShowingManifestSheet = false
     var pendingAnnotationRecording: Recording?
     var importError: String?
     var isImporting = false
