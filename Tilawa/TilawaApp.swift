@@ -16,6 +16,8 @@ struct TilawaApp: App {
         let schema = Schema([
             PlaybackSettings.self,
             ReciterPriorityEntry.self,
+            ReciterSegmentOverride.self,
+            SegmentReciterEntry.self,
             Reciter.self,
             Recording.self,
             RecordingSegment.self,

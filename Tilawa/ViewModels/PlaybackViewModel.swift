@@ -72,6 +72,7 @@ final class PlaybackViewModel {
             afterRepeatContinuePagesExtraAyah: false,
             gapBetweenAyaatMs: 0,
             reciterPriority: [ReciterSnapshot(reciterId: reciter.id ?? UUID(), reciter: reciter)],
+            segmentOverrides: [],
             riwayah: recording.safeRiwayah
         )
         await engine.play(range: range, settings: snapshot)
@@ -121,6 +122,17 @@ final class PlaybackViewModel {
             }
         }
 
+        let segmentOverrideSnapshots = (settings.segmentOverrides ?? [])
+            .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
+            .map { override -> SegmentOverrideSnapshot in
+                let snapshots = override.sortedReciterPriority.compactMap { entry -> ReciterSnapshot? in
+                    guard let rid = entry.reciterId,
+                          let r = allReciters.first(where: { $0.id == rid }) else { return nil }
+                    return ReciterSnapshot(reciterId: rid, reciter: r)
+                }
+                return SegmentOverrideSnapshot(range: override.ayahRange, reciterPriority: snapshots)
+            }
+
         return PlaybackSettingsSnapshot(
             range: range,
             connectionAyahBefore: settings.connectionAyahBefore ?? 0,
@@ -134,6 +146,7 @@ final class PlaybackViewModel {
             afterRepeatContinuePagesExtraAyah: settings.afterRepeatContinuePagesExtraAyah ?? false,
             gapBetweenAyaatMs: settings.safeGapMs,
             reciterPriority: reciterSnapshots,
+            segmentOverrides: segmentOverrideSnapshots,
             riwayah: settings.safeRiwayah
         )
     }
