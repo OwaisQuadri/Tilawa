@@ -208,6 +208,7 @@ struct PlaybackSetupSheet: View {
                         Text("5 ayaat").tag(5)
                         Text("10 ayaat").tag(10)
                         Text("1 page").tag(-100)
+                        Text("page +1").tag(-101)
                     }
                 }
             }
@@ -229,6 +230,15 @@ struct PlaybackSetupSheet: View {
         // Current page — use the exact ayah range from the rendered page
         if let pageRange = mushafVM.currentPageAyahRange {
             result.append(Preset(label: "pg \(page)", range: AyahRange(start: pageRange.first, end: pageRange.last)))
+        }
+
+        // Current page + 1 ayah — current page plus the first ayah of the next page
+        if let pageRange = mushafVM.currentPageAyahRange,
+           let nextAyah = metadata.ayah(after: pageRange.last) {
+            result.append(Preset(
+                label: "pg \(page) +1",
+                range: AyahRange(start: pageRange.first, end: nextAyah)
+            ))
         }
 
         // Each surah on current page
@@ -390,26 +400,33 @@ struct PlaybackSetupSheet: View {
     }
 
     /// Encodes afterRepeatAction + count into a single Int tag for the picker.
-    /// 0 = stop, 3/5/10 = continueAyaat with that count, -100 = continuePages(1)
+    /// 0 = stop, 3/5/10 = continueAyaat with that count, -100 = continuePages(1), -101 = continuePages(1)+extraAyah
     private func afterRepeatBinding(_ s: PlaybackSettings) -> Binding<Int> {
         Binding(
             get: {
                 switch s.safeAfterRepeatAction {
                 case .stop:           return 0
                 case .continueAyaat:  return s.afterRepeatContinueAyaatCount ?? 3
-                case .continuePages:  return -100
+                case .continuePages:  return (s.afterRepeatContinuePagesExtraAyah == true) ? -101 : -100
                 }
             },
             set: { tag in
                 switch tag {
                 case 0:
                     s.afterRepeatAction = AfterRepeatAction.stop.rawValue
+                    s.afterRepeatContinuePagesExtraAyah = false
                 case -100:
                     s.afterRepeatAction = AfterRepeatAction.continuePages.rawValue
                     s.afterRepeatContinuePagesCount = 1
+                    s.afterRepeatContinuePagesExtraAyah = false
+                case -101:
+                    s.afterRepeatAction = AfterRepeatAction.continuePages.rawValue
+                    s.afterRepeatContinuePagesCount = 1
+                    s.afterRepeatContinuePagesExtraAyah = true
                 default:
                     s.afterRepeatAction = AfterRepeatAction.continueAyaat.rawValue
                     s.afterRepeatContinueAyaatCount = tag
+                    s.afterRepeatContinuePagesExtraAyah = false
                 }
                 save()
             }

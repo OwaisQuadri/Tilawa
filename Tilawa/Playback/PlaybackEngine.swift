@@ -457,8 +457,10 @@ final class PlaybackEngine {
             case .continuePages:
                 let count = snapshot.afterRepeatContinuePagesCount
                 guard count > 0, let lastRef = ayahQueue.last else { stop(); return }
-                let continuation = PlaybackQueue.buildPageContinuation(
-                    after: lastRef, pageCount: count, metadata: metadata
+                let continuation = await PlaybackQueue.buildPageContinuation(
+                    after: lastRef, pageCount: count,
+                    extraAyah: snapshot.afterRepeatContinuePagesExtraAyah,
+                    metadata: metadata
                 )
                 guard !continuation.isEmpty else { stop(); return }
                 ayahQueue = continuation
