@@ -24,6 +24,9 @@ final class MushafViewModel {
     // MARK: - Highlighting
 
     var highlightedAyah: AyahRef?
+    /// The exact page where highlightedAyah lives — set by scrollToAyah (playback)
+    /// or handleWordTap (user tap). Nil means "use estimate / currentPageAyahRange".
+    var highlightedAyahPage: Int?
     var highlightedWord: MushafPageUIView.WordLocation?
 
     // MARK: - Theme
@@ -78,9 +81,11 @@ final class MushafViewModel {
             // Deselect on second tap
             highlightedWord = nil
             highlightedAyah = nil
+            highlightedAyahPage = nil
         } else {
             highlightedWord = wordLocation
             highlightedAyah = wordLocation.ayahRef
+            highlightedAyahPage = wordLocation.pageNumber  // exact page from the tap
         }
     }
 
@@ -92,9 +97,17 @@ final class MushafViewModel {
     }
 
     func highlightedAyahOnPage(_ page: Int) -> AyahRef? {
-        guard let ayah = highlightedAyah,
-              metadata.page(for: ayah) == page else { return nil }
-        return highlightedAyah
+        guard let ayah = highlightedAyah else { return nil }
+        // Use the confirmed exact page if available (set by scrollToAyah or handleWordTap).
+        if let exactPage = highlightedAyahPage {
+            return page == exactPage ? ayah : nil
+        }
+        // For the current page, use the actual rendered ayah range.
+        if page == currentPage, let range = currentPageAyahRange {
+            return RubService.ayah(ayah, isBetween: range.first, and: range.last) ? ayah : nil
+        }
+        // Fallback: rub-level page estimate.
+        return metadata.page(for: ayah) == page ? ayah : nil
     }
 
     // MARK: - Navigation
@@ -113,6 +126,44 @@ final class MushafViewModel {
         highlightedAyah = nil
         highlightedWord = nil
         showJumpSheet = false
+    }
+
+    // MARK: - Playback-driven scroll
+
+    private var scrollTask: Task<Void, Never>?
+
+    /// Navigates to the exact page containing `ayah`, using the PageLayoutProvider cache
+    /// (which already holds recently-visited pages) to verify rather than estimating.
+    func scrollToAyah(_ ayah: AyahRef) {
+        scrollTask?.cancel()
+        scrollTask = Task { [weak self] in
+            guard let self else { return }
+            let estimated = self.metadata.page(for: ayah)
+            let ayahKey   = RubService.ayahKey(ayah)
+
+            for delta in [0, 1, -1, 2, -2] {
+                guard !Task.isCancelled else { return }
+                let candidate = estimated + delta
+                guard (1...604).contains(candidate) else { continue }
+                guard let layout = try? await PageLayoutProvider.shared.layout(for: candidate)
+                else { continue }
+                let words = layout.lines.compactMap(\.words).flatMap { $0 }
+                if let first = words.first?.ayahRef, let last = words.last?.ayahRef {
+                    let firstKey = RubService.ayahKey(first)
+                    let lastKey  = RubService.ayahKey(last)
+                    if ayahKey >= firstKey && ayahKey <= lastKey {
+                        await MainActor.run {
+                            if candidate != self.currentPage { self.currentPage = candidate }
+                        }
+                        return
+                    }
+                }
+            }
+            // Fallback: use the estimate
+            await MainActor.run {
+                if estimated != self.currentPage { self.currentPage = estimated }
+            }
+        }
     }
 
     // MARK: - Page Changed
