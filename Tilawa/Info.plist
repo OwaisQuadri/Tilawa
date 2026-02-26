@@ -4,7 +4,10 @@
 <dict>
 	<key>UIBackgroundModes</key>
 	<array>
+		<string>audio</string>
 		<string>remote-notification</string>
 	</array>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Tilawa can record recitations directly in the app for use as a personal audio source.</string>
 </dict>
 </plist>

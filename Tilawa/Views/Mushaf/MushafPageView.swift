@@ -4,7 +4,8 @@ import SwiftUI
 /// background, padding, and page side indicator.
 struct MushafPageView: View {
     let pageNumber: Int
-    @Environment(MushafViewModel.self) private var mushafVM
+    @Environment(MushafViewModel.self)  private var mushafVM
+    @Environment(PlaybackViewModel.self) private var playbackVM
     @State private var pageLayout: QULPageLayout?
 
     private var isRightSidePage: Bool { pageNumber % 2 == 0 }
@@ -17,6 +18,21 @@ struct MushafPageView: View {
     /// First 2 pages (Al-Fatiha) and last 10 pages (short surahs in Juz 30).
     private static let centeredPages: Set<Int> = Set(1...2).union(Set(600...604))
 
+    /// The ayah to highlight on this specific page.
+    /// During playback, checks directly against the page's own loaded layout — no estimation,
+    /// no async relay. Falls back to the user-tap highlight when nothing is playing.
+    private var activeHighlightedAyah: AyahRef? {
+        if let ayah = playbackVM.currentAyah, let layout = pageLayout {
+            let words = layout.lines.compactMap(\.words).flatMap { $0 }
+            if let first = words.first?.ayahRef, let last = words.last?.ayahRef,
+               RubService.ayah(ayah, isBetween: first, and: last) {
+                return ayah
+            }
+            return nil  // playing, but this ayah is on a different page
+        }
+        return mushafVM.highlightedAyahOnPage(pageNumber)
+    }
+
     var body: some View {
         Group {
             if let layout = pageLayout {
@@ -24,7 +40,7 @@ struct MushafPageView: View {
                     pageLayout: layout,
                     font: mushafVM.font(forPage: pageNumber),
                     highlightedWord: mushafVM.highlightedWordOnPage(pageNumber),
-                    highlightedAyah: mushafVM.highlightedAyahOnPage(pageNumber),
+                    highlightedAyah: activeHighlightedAyah,
                     theme: mushafVM.theme,
                     centeredPage: Self.centeredPages.contains(pageNumber),
                     onWordTapped: { mushafVM.handleWordTap($0) }

@@ -3,9 +3,14 @@ import SwiftUI
 /// The main Mushaf reading view with horizontal page swiping.
 struct MushafView: View {
     @Environment(MushafViewModel.self) private var mushafVM
+    @Environment(PlaybackViewModel.self) private var playbackVM
+
+    @State private var showPlaybackSetup = false
 
     var body: some View {
         @Bindable var vm = mushafVM
+        // Accessing currentAyah here establishes @Observable tracking so onChange fires reliably.
+        let currentAyah = playbackVM.currentAyah
 
         NavigationStack {
             TabView(selection: $vm.currentPage) {
@@ -21,6 +26,13 @@ struct MushafView: View {
             .onChange(of: mushafVM.currentPage, initial: true) { _, newPage in
                 mushafVM.onPageChanged(to: newPage)
             }
+            .onChange(of: currentAyah) { _, newAyah in
+                // Highlighting is handled directly inside MushafPageView via playbackVM.currentAyah.
+                // This handler only drives page navigation.
+                if let ayah = newAyah {
+                    mushafVM.scrollToAyah(ayah)
+                }
+            }
             .toolbarTitleDisplayMode(.inline)
             .ignoresSafeArea()
             .toolbar {
@@ -28,10 +40,20 @@ struct MushafView: View {
                     MushafHeaderView()
                         .environment(\.layoutDirection, .leftToRight)
                 }
-
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showPlaybackSetup = true
+                    } label: {
+                        Image(systemName: "play.fill")
+                            .symbolEffect(.pulse, isActive: playbackVM.state.isActive)
+                    }
+                }
             }
             .sheet(isPresented: $vm.showJumpSheet) {
                 JumpToAyahSheet()
+            }
+            .sheet(isPresented: $showPlaybackSetup) {
+                PlaybackSetupSheet()
             }
         }
     }

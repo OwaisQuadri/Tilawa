@@ -54,7 +54,7 @@ final class QuranMetadataService: Sendable {
     }
 
     func surahName(_ number: Int) -> String {
-        surah(number)?.name ?? ""
+        surah(number)?.englishName ?? ""
     }
 
     func ayahCount(surah: Int) -> Int {
@@ -62,19 +62,10 @@ final class QuranMetadataService: Sendable {
     }
 
     /// Returns the page number for a given ayah reference.
-    /// Uses binary search on surah start pages + proportional estimation.
+    /// Uses rub-level interpolation via RubService for significantly better accuracy
+    /// than surah-level proportional estimation.
     func page(for ref: AyahRef) -> Int {
-        guard let info = surah(ref.surah) else { return 1 }
-        let nextSurahStart = ref.surah < 114
-            ? (surah(ref.surah + 1)?.startPage ?? 605)
-            : 605
-        let totalPages = nextSurahStart - info.startPage
-        guard totalPages > 0, info.ayahCount > 0 else { return info.startPage }
-
-        // Proportional estimate within the surah's page range
-        let fraction = Double(ref.ayah - 1) / Double(info.ayahCount)
-        let estimated = info.startPage + Int(fraction * Double(totalPages))
-        return min(max(estimated, info.startPage), nextSurahStart - 1)
+        RubService.shared.estimatedPage(for: ref, metadata: self)
     }
 
     /// Returns the primary surah on a given page.
