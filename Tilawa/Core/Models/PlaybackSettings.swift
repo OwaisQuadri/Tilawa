@@ -30,6 +30,7 @@ final class PlaybackSettings {
     var afterRepeatAction: String?  // AfterRepeatAction.rawValue
     var afterRepeatContinueAyaatCount: Int?
     var afterRepeatContinuePagesCount: Int?
+    var afterRepeatContinuePagesExtraAyah: Bool?
 
     // --- Riwayah (stored as raw string for CloudKit compat) ---
     var selectedRiwayah: String?    // Riwayah.rawValue

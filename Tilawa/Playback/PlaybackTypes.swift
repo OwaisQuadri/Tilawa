@@ -32,6 +32,7 @@ struct PlaybackSettingsSnapshot: Sendable {
     let afterRepeatAction: AfterRepeatAction
     let afterRepeatContinueAyaatCount: Int
     let afterRepeatContinuePagesCount: Int
+    let afterRepeatContinuePagesExtraAyah: Bool
     let gapBetweenAyaatMs: Int
     let reciterPriority: [ReciterSnapshot]
     let riwayah: Riwayah

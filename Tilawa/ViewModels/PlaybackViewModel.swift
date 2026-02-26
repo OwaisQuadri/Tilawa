@@ -69,6 +69,7 @@ final class PlaybackViewModel {
             afterRepeatAction: .stop,
             afterRepeatContinueAyaatCount: 0,
             afterRepeatContinuePagesCount: 0,
+            afterRepeatContinuePagesExtraAyah: false,
             gapBetweenAyaatMs: 0,
             reciterPriority: [ReciterSnapshot(reciterId: reciter.id ?? UUID(), reciter: reciter)],
             riwayah: recording.safeRiwayah
@@ -130,6 +131,7 @@ final class PlaybackViewModel {
             afterRepeatAction: settings.safeAfterRepeatAction,
             afterRepeatContinueAyaatCount: settings.afterRepeatContinueAyaatCount ?? 0,
             afterRepeatContinuePagesCount: settings.afterRepeatContinuePagesCount ?? 0,
+            afterRepeatContinuePagesExtraAyah: settings.afterRepeatContinuePagesExtraAyah ?? false,
             gapBetweenAyaatMs: settings.safeGapMs,
             reciterPriority: reciterSnapshots,
             riwayah: settings.safeRiwayah
