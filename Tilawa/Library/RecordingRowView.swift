@@ -1,9 +1,14 @@
 import SwiftUI
+import SwiftData
 
 struct RecordingRowView: View {
 
     let recording: Recording
     var onTag: () -> Void
+
+    @Environment(\.modelContext) private var context
+    @State private var showingRename = false
+    @State private var pendingName = ""
 
     var body: some View {
         HStack(spacing: 12) {
@@ -34,6 +39,22 @@ struct RecordingRowView: View {
                 .controlSize(.small)
         }
         .padding(.vertical, 2)
+        .swipeActions(edge: .leading) {
+            Button("Rename", systemImage: "pencil") {
+                pendingName = recording.safeTitle
+                showingRename = true
+            }
+            .tint(.blue)
+        }
+        .alert("Rename Recording", isPresented: $showingRename) {
+            TextField("Name", text: $pendingName)
+                .autocorrectionDisabled()
+            Button("Save") {
+                recording.title = pendingName.isEmpty ? recording.title : pendingName
+                try? context.save()
+            }
+            Button("Cancel", role: .cancel) { }
+        }
     }
 
     private var durationLabel: String {
