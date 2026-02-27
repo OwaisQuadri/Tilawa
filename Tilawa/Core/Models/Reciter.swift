@@ -28,6 +28,10 @@ final class Reciter {
     /// Priority position of the CDN url-template source (audioURLTemplate) in the unified source list.
     /// nil = ordered after all explicitly-positioned items.
     var cdnTemplateOrder: Int?
+    /// JSON-encoded [AyahRef] of ayahs confirmed absent on the CDN.
+    /// nil  = availability check not yet performed (treat all ayahs as available).
+    /// "[]" = check performed; reciter is fully complete.
+    var missingAyahsJSON: String?
 
     @Relationship(deleteRule: .cascade)
     var recordings: [Recording]?
@@ -44,6 +48,7 @@ final class Reciter {
         self.audioURLTemplate = nil
         self.cdnManifestOrder = nil
         self.cdnTemplateOrder = nil
+        self.missingAyahsJSON = nil
         self.recordings = nil
     }
 
@@ -71,6 +76,17 @@ final class Reciter {
         guard let json = downloadedSurahsJSON,
               let data = json.data(using: .utf8),
               let list = try? JSONDecoder().decode([Int].self, from: data) else { return [] }
+        return list
+    }
+
+    /// True once the CDN availability check has been performed for this reciter.
+    var availabilityChecked: Bool { missingAyahsJSON != nil }
+
+    /// Ayahs confirmed absent on the CDN. Empty when check not yet done or reciter is complete.
+    var missingAyahs: [AyahRef] {
+        guard let json = missingAyahsJSON,
+              let data = json.data(using: .utf8),
+              let list = try? JSONDecoder().decode([AyahRef].self, from: data) else { return [] }
         return list
     }
 }

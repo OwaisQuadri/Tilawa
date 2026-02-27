@@ -9,5 +9,9 @@
 	</array>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Tilawa can record recitations directly in the app for use as a personal audio source.</string>
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

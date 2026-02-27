@@ -2,16 +2,20 @@ import Foundation
 import SwiftData
 
 enum ReciterImportMode: String, CaseIterable {
-    case jsonURL   = "JSON URL"
-    case jsonFile  = "JSON File"
-    case urlFormat = "URL Format"
+    case presets   = "Presets"
+    case jsonURL   = "URL"
+    case jsonFile  = "File"
+    case urlFormat = "Template"
 }
 
 @Observable
 @MainActor
 final class ManifestImportViewModel {
 
-    var importMode: ReciterImportMode = .jsonURL
+    var importMode: ReciterImportMode = .presets
+
+    // MARK: - Presets mode
+    var selectedPreset: ReciterPreset? = nil
 
     // MARK: - JSON URL mode
     var manifestURL: String = ""
@@ -151,6 +155,64 @@ final class ManifestImportViewModel {
         isLoading = false
     }
 
+    // MARK: - Import: Preset
+
+    func importFromPreset(_ preset: ReciterPreset, context: ModelContext) {
+        isLoading = true
+        errorMessage = nil
+        do {
+            let reciter: Reciter
+            switch preset.source {
+            case .manifestBaseURL(let baseURL, let namingPattern, let format, _):
+                let manifest = ReciterManifest(
+                    schemaVersion: "1.0",
+                    reciter: ReciterManifest.ReciterInfo(
+                        name: preset.name,
+                        shortName: preset.shortName,
+                        riwayah: preset.riwayah.rawValue,
+                        style: preset.style
+                    ),
+                    audio: ReciterManifest.AudioInfo(
+                        baseUrl: baseURL,
+                        format: format,
+                        namingPattern: namingPattern.rawValue,
+                        bitrate: nil
+                    )
+                )
+                reciter = try ReciterManifestImporter().createReciter(from: manifest, context: context)
+
+            case .urlTemplate(let template, let format):
+                let name    = preset.name
+                let riwayah = preset.riwayah.rawValue
+                let descriptor = FetchDescriptor<Reciter>(
+                    predicate: #Predicate { $0.name == name && $0.riwayah == riwayah }
+                )
+                let existing = try context.fetch(descriptor)
+                let r = existing.first ?? Reciter()
+                if existing.isEmpty { context.insert(r) }
+                r.id                  = r.id ?? UUID()
+                r.name                = preset.name
+                r.shortName           = preset.shortName
+                r.riwayah             = preset.riwayah.rawValue
+                r.style               = preset.style
+                r.audioFileFormat     = format
+                r.namingPatternType   = ReciterNamingPattern.urlTemplate.rawValue
+                r.audioURLTemplate    = template
+                r.localCacheDirectory = r.id!.uuidString
+                r.isDownloaded        = false
+                reciter = r
+            }
+
+            try context.save()
+            importedReciter = reciter
+        } catch let e as ManifestImportError {
+            errorMessage = e.errorDescription
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isLoading = false
+    }
+
     // MARK: - Priority list
 
     func addReciterToPriorityList(_ reciter: Reciter, context: ModelContext) {
@@ -158,14 +220,27 @@ final class ManifestImportViewModel {
         let descriptor = FetchDescriptor<PlaybackSettings>()
         guard let settings = try? context.fetch(descriptor).first else { return }
 
-        let alreadyInList = (settings.reciterPriority ?? [])
+        // Global priority: append at the bottom
+        let alreadyInGlobal = (settings.reciterPriority ?? [])
             .contains { $0.reciterId == reciterId }
-        guard !alreadyInList else { return }
+        if !alreadyInGlobal {
+            let maxOrder = (settings.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
+            let entry = ReciterPriorityEntry(order: maxOrder + 1, reciterId: reciterId)
+            context.insert(entry)
+            settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
+        }
 
-        let maxOrder = (settings.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
-        let entry = ReciterPriorityEntry(order: maxOrder + 1, reciterId: reciterId)
-        context.insert(entry)
-        settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
+        // Segment overrides: append at the bottom of each segment's priority list
+        for segment in settings.segmentOverrides ?? [] {
+            let alreadyInSegment = (segment.reciterPriority ?? [])
+                .contains { $0.reciterId == reciterId }
+            guard !alreadyInSegment else { continue }
+            let maxOrder = (segment.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
+            let segEntry = SegmentReciterEntry(order: maxOrder + 1, reciterId: reciterId)
+            context.insert(segEntry)
+            segment.reciterPriority = (segment.reciterPriority ?? []) + [segEntry]
+        }
+
         try? context.save()
     }
 

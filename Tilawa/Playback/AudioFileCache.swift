@@ -8,7 +8,8 @@ actor AudioFileCache {
     static let shared = AudioFileCache()
 
     private let fileManager = FileManager.default
-    private var activeDownloads: Set<String> = []  // keys being downloaded
+    private var activeDownloads: Set<String> = []       // keys currently in-flight
+    private var knownMissing404s: Set<String> = []      // keys that returned HTTP 404 this session
 
     // MARK: - URL Construction
 
@@ -50,11 +51,17 @@ actor AudioFileCache {
 
     // MARK: - Single File Download
 
-    /// Downloads a single ayah's audio file. No-ops if already cached or downloading.
+    /// Returns true if this ayah returned HTTP 404 during this session and should not be retried.
+    func isMissing404(ref: AyahRef, reciter: Reciter) -> Bool {
+        knownMissing404s.contains(cacheKey(ref: ref, reciter: reciter))
+    }
+
+    /// Downloads a single ayah's audio file. No-ops if already cached, downloading, or known 404.
     func download(ref: AyahRef, reciter: Reciter) async throws {
         let key = cacheKey(ref: ref, reciter: reciter)
         guard !isFileCached(ref: ref, reciter: reciter),
-              !activeDownloads.contains(key) else { return }
+              !activeDownloads.contains(key),
+              !knownMissing404s.contains(key) else { return }
 
         guard let remoteURL = remoteURL(for: ref, reciter: reciter) else { return }
 
@@ -68,6 +75,7 @@ actor AudioFileCache {
         // Reject non-200 responses (e.g. 403 rate-limit or 404 returns HTML, not MP3)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             try? fileManager.removeItem(at: tempURL)
+            if http.statusCode == 404 { knownMissing404s.insert(key) }
             throw URLError(.badServerResponse)
         }
         // Move from temp location to permanent cache
@@ -101,24 +109,25 @@ actor AudioFileCache {
         var completed = 0
         let total = refs.count
 
-        try await withThrowingTaskGroup(of: Void.self) { group in
+        // Use non-throwing group so individual 404s don't abort the whole surah download.
+        await withTaskGroup(of: Void.self) { group in
             var inflight = 0
             for ref in refs {
                 // Limit concurrency to 6
                 if inflight >= 6 {
-                    try await group.next()
+                    await group.next()
                     completed += 1
                     progress?(Double(completed) / Double(total))
                     inflight -= 1
                 }
                 group.addTask { [weak self] in
                     guard let self else { return }
-                    try await self.download(ref: ref, reciter: reciter)
+                    try? await self.download(ref: ref, reciter: reciter)
                 }
                 inflight += 1
             }
             // Drain remaining
-            for try await _ in group {
+            for await _ in group {
                 completed += 1
                 progress?(Double(completed) / Double(total))
             }

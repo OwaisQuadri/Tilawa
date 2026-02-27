@@ -31,6 +31,14 @@ struct RangePickerView: View {
 
     // MARK: - Derived
 
+    /// Surahs that have at least one available ayah.
+    private var availableSurahs: [QuranMetadataService.SurahInfo] {
+        guard let allowed = allowedAyahs else { return metadata.surahs }
+        return metadata.surahs.filter { s in
+            allowed.contains { $0.surah == s.number }
+        }
+    }
+
     /// Ayahs to show in the wheel for the current localSurah.
     private var availableAyahs: [Int] {
         let count = max(1, metadata.ayahCount(surah: localSurah))
@@ -45,11 +53,11 @@ struct RangePickerView: View {
 
     var body: some View {
         HStack(spacing: 0) {
-            // Surah picker
+            // Surah picker — filtered to surahs with available ayahs
             VStack(spacing: 0) {
                 Text("Surah").font(.caption).foregroundStyle(.secondary)
                 Picker("Surah", selection: $localSurah) {
-                    ForEach(metadata.surahs, id: \.number) { s in
+                    ForEach(availableSurahs, id: \.number) { s in
                         HStack {
                             Text("\(s.number). \(s.englishName)")
                                 .font(.caption)
@@ -62,6 +70,13 @@ struct RangePickerView: View {
                     }
                 }
                 .pickerStyle(.wheel)
+                .onAppear {
+                    // Snap to first available surah if current selection isn't available
+                    if !availableSurahs.contains(where: { $0.number == localSurah }),
+                       let first = availableSurahs.first {
+                        localSurah = first.number
+                    }
+                }
                 .onChange(of: localSurah) { _, _ in
                     // Clamp ayah to what's available in the new surah
                     if !availableAyahs.contains(localAyah) {

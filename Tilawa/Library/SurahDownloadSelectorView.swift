@@ -6,6 +6,7 @@ import SwiftData
 struct SurahDownloadSelectorView: View {
 
     let reciter: Reciter
+    var dismissSheet: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
@@ -73,7 +74,7 @@ struct SurahDownloadSelectorView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 if isDownloading {
-                    Button("Dismiss") { dismiss() }
+                    Button("Dismiss") { dismissFully() }
                 } else {
                     Button("Download") { startDownload() }
                         .disabled(selectedSurahs.isEmpty)
@@ -84,13 +85,13 @@ struct SurahDownloadSelectorView: View {
         // "Downloads started — you can leave" alert
         .alert("Downloads Started", isPresented: $showBackgroundAlert) {
             Button("Stay") {}
-            Button("Dismiss") { dismiss() }
+            Button("Dismiss") { dismissFully() }
         } message: {
             Text("Downloading \(selectedSurahs.count) surah\(selectedSurahs.count == 1 ? "" : "s") for \(reciter.safeName). Downloads continue in the background and you'll get a notification when done.")
         }
         // Completion alert (fires if view is still open)
         .alert("Download Complete", isPresented: $showCompletionAlert) {
-            Button("OK") { dismiss() }
+            Button("OK") { dismissFully() }
         } message: {
             Text(completionMessage)
         }
@@ -183,6 +184,11 @@ struct SurahDownloadSelectorView: View {
     }
 
     // MARK: - Actions
+
+    /// Dismisses the entire import sheet (back to Library), falling back to a single pop.
+    private func dismissFully() {
+        if let dismissSheet { dismissSheet() } else { dismiss() }
+    }
 
     private func startDownload() {
         let jobId = dm.enqueue(

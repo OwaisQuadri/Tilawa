@@ -16,6 +16,7 @@ struct SegmentReciterPriorityView: View {
     @State private var endAyah:    Int = 7
 
     @State private var orderedEntries: [SegmentReciterEntry] = []
+    @State private var hasInitialized = false
 
     private let metadata = QuranMetadataService.shared
 
@@ -28,45 +29,18 @@ struct SegmentReciterPriorityView: View {
         return "\(startName) \(startSurah):\(startAyah) – \(endName) \(endSurah):\(endAyah)"
     }
 
-    // Reciters with audio that are not yet in this segment's priority list
-    private var unlistedReciters: [Reciter] {
-        let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
-        return allReciters.filter { r in
-            guard let id = r.id else { return false }
-            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
-        }.sorted { $0.safeName < $1.safeName }
-    }
-
     var body: some View {
         List {
             rangeSection
             prioritySection
-
-            if !unlistedReciters.isEmpty {
-                Section("Not in priority list") {
-                    ForEach(unlistedReciters, id: \.id) { reciter in
-                        Button {
-                            addToPriority(reciter)
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(reciter.safeName)
-                                        .foregroundStyle(.primary)
-                                    Text(reciter.safeRiwayah.displayName)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "plus.circle")
-                            }
-                        }
-                    }
-                }
-            }
         }
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { loadState() }
+        .onAppear {
+            guard !hasInitialized else { return }
+            loadState()
+            hasInitialized = true
+        }
     }
 
     // MARK: - Sections
@@ -108,17 +82,12 @@ struct SegmentReciterPriorityView: View {
                 orderedEntries.move(fromOffsets: from, toOffset: to)
                 saveOrder()
             }
-            .onDelete { indexSet in
-                for i in indexSet {
-                    removeEntry(orderedEntries[i])
-                }
-            }
         } header: {
             Text("Hold and drag to reorder for this segment.")
                 .textCase(nil)
                 .font(.caption)
         } footer: {
-            Text("Swipe left to remove a reciter. The global default order applies outside this range.")
+            Text("The global default order applies outside this range.")
                 .font(.caption)
         }
         .environment(\.editMode, .constant(.active))
@@ -140,27 +109,17 @@ struct SegmentReciterPriorityView: View {
                 HStack(spacing: 6) {
                     Text(reciter?.safeRiwayah.displayName ?? "")
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                    if let style = reciter?.style, !style.isEmpty {
-                        Text("· \(style.capitalized)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     if reciter?.hasPersonalRecordings == true {
-                        Label("Personal", systemImage: "person.wave.2")
+                        Label("Personal", systemImage: "waveform.badge.mic")
                             .font(.caption2)
-                            .foregroundStyle(.blue)
+                            .labelStyle(.iconOnly)
                     }
                 }
+                .foregroundStyle(.secondary)
             }
 
             Spacer()
-
-            Toggle("", isOn: enabledBinding(entry))
-                .labelsHidden()
-                .controlSize(.small)
         }
-        .opacity(entry.isEnabled == false ? 0.4 : 1.0)
     }
 
     // MARK: - State management
@@ -170,6 +129,23 @@ struct SegmentReciterPriorityView: View {
         startAyah  = segmentOverride.startAyah  ?? 1
         endSurah   = segmentOverride.endSurah   ?? 1
         endAyah    = segmentOverride.endAyah    ?? 7
+        orderedEntries = (segmentOverride.reciterPriority ?? [])
+            .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
+
+        // Auto-add any reciter with audio that isn't in this segment's list yet (at the bottom)
+        let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
+        let unlisted = allReciters.filter { r in
+            guard let id = r.id else { return false }
+            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
+        }
+        guard !unlisted.isEmpty else { return }
+        let maxOrder = orderedEntries.compactMap { $0.order }.max() ?? -1
+        for (i, reciter) in unlisted.enumerated() {
+            let segEntry = SegmentReciterEntry(order: maxOrder + 1 + i, reciterId: reciter.id!)
+            context.insert(segEntry)
+            segmentOverride.reciterPriority = (segmentOverride.reciterPriority ?? []) + [segEntry]
+        }
+        try? context.save()
         orderedEntries = (segmentOverride.reciterPriority ?? [])
             .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
     }
@@ -187,30 +163,6 @@ struct SegmentReciterPriorityView: View {
             entry.order = index
         }
         try? context.save()
-    }
-
-    private func addToPriority(_ reciter: Reciter) {
-        guard let reciterId = reciter.id else { return }
-        let maxOrder = (segmentOverride.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
-        let entry = SegmentReciterEntry(order: maxOrder + 1, reciterId: reciterId)
-        context.insert(entry)
-        segmentOverride.reciterPriority = (segmentOverride.reciterPriority ?? []) + [entry]
-        try? context.save()
-        loadState()
-    }
-
-    private func removeEntry(_ entry: SegmentReciterEntry) {
-        orderedEntries.removeAll { $0.id == entry.id }
-        segmentOverride.reciterPriority = (segmentOverride.reciterPriority ?? []).filter { $0.id != entry.id }
-        context.delete(entry)
-        try? context.save()
-    }
-
-    private func enabledBinding(_ entry: SegmentReciterEntry) -> Binding<Bool> {
-        Binding(
-            get: { entry.isEnabled ?? true },
-            set: { entry.isEnabled = $0; try? context.save() }
-        )
     }
 
     private func clampEndIfNeeded() {

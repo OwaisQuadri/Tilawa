@@ -143,6 +143,9 @@ final class ReciterResolver {
         let localURL = await cache.localFileURL(for: ref, reciter: reciter)
 
         if !FileManager.default.fileExists(atPath: localURL.path) {
+            // Skip silently if this file returned 404 earlier this session — no log, no retry.
+            if await cache.isMissing404(ref: ref, reciter: reciter) { return nil }
+
             let remoteURL = await cache.remoteURL(for: ref, reciter: reciter)
             print("   ⬇️ \(localURL.lastPathComponent) not cached — downloading from \(remoteURL?.absoluteString ?? "nil")")
             do {
