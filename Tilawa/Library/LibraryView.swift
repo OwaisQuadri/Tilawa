@@ -5,6 +5,7 @@ import SwiftData
 struct LibraryView: View {
 
     @State private var vm = LibraryViewModel()
+    @State private var showingRecordingSession = false
     @Environment(\.modelContext) private var context
 
     @Query(sort: \Recording.importedAt, order: .reverse)
@@ -33,6 +34,10 @@ struct LibraryView: View {
             // Inline annotation editor
             .sheet(item: $vm.pendingAnnotationRecording) { recording in
                 AnnotationEditorView(recording: recording)
+            }
+            // In-app recording
+            .fullScreenCover(isPresented: $showingRecordingSession) {
+                RecordingSessionView()
             }
             // Import error
             .alert("Import Failed", isPresented: .constant(vm.importError != nil)) {
@@ -91,7 +96,7 @@ struct LibraryView: View {
         ContentUnavailableView {
             Label("No Recordings Yet", systemImage: "waveform")
         } description: {
-            Text("Import audio files or extract audio from a video.")
+            Text("Record audio, import files, or extract audio from a video.")
         } actions: {
             Menu("Import") {
                 importMenuItems
@@ -113,6 +118,12 @@ struct LibraryView: View {
 
     @ViewBuilder
     private var importMenuItems: some View {
+        Button {
+            showingRecordingSession = true
+        } label: {
+            Label("Record Audio", systemImage: "mic.fill")
+        }
+
         Button {
             vm.isShowingAudioPicker = true
         } label: {

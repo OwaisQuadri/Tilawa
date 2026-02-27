@@ -28,6 +28,15 @@ struct RecordingDetailView: View {
         List {
             // Recording metadata
             Section("Info") {
+                LabeledContent("Name") {
+                    TextField("Recording name", text: Binding(
+                        get: { recording.safeTitle },
+                        set: { recording.title = $0 }
+                    ))
+                    .multilineTextAlignment(.trailing)
+                    .autocorrectionDisabled()
+                    .onSubmit { try? context.save() }
+                }
                 LabeledContent("Duration", value: durationLabel)
                 LabeledContent("Format", value: (recording.fileFormat ?? "—").uppercased())
                 if let date = recording.importedAt {
