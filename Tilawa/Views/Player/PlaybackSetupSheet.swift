@@ -50,7 +50,7 @@ struct PlaybackSetupSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .onAppear { initializeRange() }
+        .onAppear { initializeRange(); snapReciterSelectionIfNeeded(); snapRangeToAvailableIfNeeded() }
     }
 
     // MARK: - Recitation section
@@ -62,7 +62,7 @@ struct PlaybackSetupSheet: View {
                 // Riwayah
                 LabeledContent("Riwayah") {
                     Picker("", selection: riwayahBinding(s)) {
-                        ForEach(Riwayah.allCases, id: \.self) { r in
+                        ForEach(availableRiwayat(for: s), id: \.self) { r in
                             Text(r.displayName).tag(r)
                         }
                     }
@@ -89,8 +89,8 @@ struct PlaybackSetupSheet: View {
                     .pickerStyle(.menu)
                 }
 
-                // Inline error if no reciters match
-                if matchingReciters(riwayah: s.safeRiwayah).isEmpty {
+                // Inline error if no enabled reciters match
+                if enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s).isEmpty {
                     Text("No reciters available for this riwayah")
                         .font(.caption)
                         .foregroundStyle(.red)
@@ -114,11 +114,12 @@ struct PlaybackSetupSheet: View {
 
     @ViewBuilder
     private var rangeSection: some View {
+        let (allowedStart, allowedEnd) = allowedAyahRanges
         Section {
-            // Preset chips
+            // Preset chips — only show ranges fully covered by the selected reciter
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    ForEach(presets, id: \.label) { preset in
+                    ForEach(presets.filter { isPresetFullyAvailable($0) }, id: \.label) { preset in
                         Button(preset.label) { applyPreset(preset) }
                             .buttonStyle(.bordered)
                             .controlSize(.small)
@@ -128,9 +129,10 @@ struct PlaybackSetupSheet: View {
             }
             .listRowInsets(.init(top: 8, leading: 16, bottom: 8, trailing: 16))
 
-            // From row
+            // From row — restricted to valid start ayahs
             NavigationLink {
-                RangePickerView(title: "From", surah: $startSurah, ayah: $startAyah)
+                RangePickerView(title: "From", surah: $startSurah, ayah: $startAyah,
+                                allowedAyahs: allowedStart)
                     .onDisappear { clampEndIfNeeded() }
             } label: {
                 LabeledContent("From") {
@@ -139,9 +141,10 @@ struct PlaybackSetupSheet: View {
                 }
             }
 
-            // To row
+            // To row — restricted to valid end ayahs
             NavigationLink {
-                RangePickerView(title: "To", surah: $endSurah, ayah: $endAyah)
+                RangePickerView(title: "To", surah: $endSurah, ayah: $endAyah,
+                                allowedAyahs: allowedEnd)
                     .onDisappear { clampEndIfNeeded() }
             } label: {
                 LabeledContent("To") {
@@ -151,6 +154,12 @@ struct PlaybackSetupSheet: View {
             }
         } header: {
             Text("Range")
+        }
+        .onChange(of: settings?.selectedReciterId) { _, _ in
+            snapRangeToAvailableIfNeeded()
+        }
+        .onChange(of: settings?.selectedRiwayah) { _, _ in
+            snapRangeToAvailableIfNeeded()
         }
     }
 
@@ -329,19 +338,199 @@ struct PlaybackSetupSheet: View {
         if let id = s.selectedReciterId {
             return allReciters.first(where: { $0.id == id }) == nil
         }
-        return matchingReciters(riwayah: s.safeRiwayah).isEmpty
+        return enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s).isEmpty
     }
 
     private func matchingReciters(riwayah: Riwayah) -> [Reciter] {
         allReciters.filter { $0.safeRiwayah == riwayah }
     }
 
+    /// Reciters for the given riwayah that are enabled in the priority list (or not listed = enabled by default).
+    private func enabledMatchingReciters(riwayah: Riwayah, settings s: PlaybackSettings) -> [Reciter] {
+        matchingReciters(riwayah: riwayah).filter { r in
+            (s.reciterPriority ?? []).first(where: { $0.reciterId == r.id })?.isEnabled ?? true
+        }
+    }
+
+    /// Riwayat that have at least one enabled reciter.
+    /// Falls back to all cases if the library is empty.
+    private func availableRiwayat(for s: PlaybackSettings) -> [Riwayah] {
+        let withEnabled = Riwayah.allCases.filter { r in !enabledMatchingReciters(riwayah: r, settings: s).isEmpty }
+        guard !withEnabled.isEmpty else { return Riwayah.allCases }
+        return withEnabled
+    }
+
+    /// If the current riwayah has no enabled reciters, auto-switch to the first one that does.
+    private func snapReciterSelectionIfNeeded() {
+        guard let s = settings else { return }
+        let available = availableRiwayat(for: s)
+        guard !available.contains(s.safeRiwayah), let first = available.first else { return }
+        s.selectedRiwayah = first.rawValue
+        // Clear specific reciter if it no longer matches the new riwayah
+        if let id = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == id }),
+           reciter.safeRiwayah != first {
+            s.selectedReciterId = nil
+        }
+        save()
+    }
+
+    // MARK: - Availability helpers
+
+    /// Available ayahs for the currently selected reciter/riwayah.
+    /// nil = no filtering (all available or availability unknown).
+    private var availableAyahsForSelection: Set<AyahRef>? {
+        guard let s = settings else { return nil }
+        if let reciterId = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == reciterId }) {
+            return availableAyahs(for: reciter)
+        }
+        // Auto mode: union of per-reciter available sets.
+        // An ayah is available if at least ONE enabled reciter has it.
+        let enabled = enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s)
+        guard !enabled.isEmpty else { return nil }
+        let perReciterAvail = enabled.map { availableAyahs(for: $0) }
+        // Any unknown (nil) reciter means we can't restrict.
+        if perReciterAvail.contains(where: { $0 == nil }) { return nil }
+        var union = Set<AyahRef>()
+        union.reserveCapacity(6236)
+        for case let avail? in perReciterAvail { union.formUnion(avail) }
+        return union.isEmpty ? nil : union
+    }
+
+    /// Separate allowed sets for the FROM and TO pickers.
+    /// A valid start ayah must have its immediate successor also available (prevents starting at
+    /// the trailing edge of a block). A valid end ayah must have its predecessor also available.
+    /// Isolated single-ayah segments are allowed in both.
+    private var allowedAyahRanges: (start: Set<AyahRef>?, end: Set<AyahRef>?) {
+        guard let available = availableAyahsForSelection else { return (nil, nil) }
+        return (allowedStartAyahs(from: available), allowedEndAyahs(from: available))
+    }
+
+    private func availableAyahs(for reciter: Reciter) -> Set<AyahRef>? {
+        // Local-only reciter: derive from annotated RecordingSegments
+        if !reciter.hasCDN {
+            return reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter) : nil
+        }
+        // CDN reciter: use pre-computed availability check
+        guard reciter.availabilityChecked else { return nil }
+        let missing = Set(reciter.missingAyahs)
+        guard !missing.isEmpty else { return nil }
+        return buildAvailableSet(excluding: missing)
+    }
+
+    /// Expands all RecordingSegments for a local reciter into individual AyahRefs.
+    /// Returns nil if the reciter has no segments or covers all 6236 ayahs.
+    private func availableAyahsForLocalReciter(_ reciter: Reciter) -> Set<AyahRef>? {
+        let segments = reciter.recordings?.flatMap { $0.segments ?? [] } ?? []
+        guard !segments.isEmpty else { return nil }
+        var available = Set<AyahRef>()
+        available.reserveCapacity(6236)
+        for seg in segments {
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { continue }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber ?? sa
+            var current = AyahRef(surah: ss, ayah: sa)
+            let end = AyahRef(surah: es, ayah: ea)
+            while current <= end {
+                available.insert(current)
+                guard let next = nextAyah(after: current) else { break }
+                current = next
+            }
+        }
+        return available.count >= 6236 ? nil : available
+    }
+
+    /// True if all ayahs in the preset's range are in the available set.
+    private func isPresetFullyAvailable(_ preset: Preset) -> Bool {
+        guard let allowed = availableAyahsForSelection else { return true }
+        var current = preset.range.start
+        while current <= preset.range.end {
+            if !allowed.contains(current) { return false }
+            guard let next = nextAyah(after: current) else { break }
+            current = next
+        }
+        return true
+    }
+
+    private func buildAvailableSet(excluding missing: Set<AyahRef>) -> Set<AyahRef> {
+        var available = Set<AyahRef>()
+        available.reserveCapacity(6236)
+        for surah in 1...114 {
+            let count = metadata.ayahCount(surah: surah)
+            for ayah in 1...max(1, count) {
+                let ref = AyahRef(surah: surah, ayah: ayah)
+                if !missing.contains(ref) { available.insert(ref) }
+            }
+        }
+        return available
+    }
+
+    // MARK: - Sequential ayah navigation
+
+    private func nextAyah(after ref: AyahRef) -> AyahRef? {
+        let count = metadata.ayahCount(surah: ref.surah)
+        if ref.ayah < count { return AyahRef(surah: ref.surah, ayah: ref.ayah + 1) }
+        if ref.surah < 114 { return AyahRef(surah: ref.surah + 1, ayah: 1) }
+        return nil
+    }
+
+    private func previousAyah(before ref: AyahRef) -> AyahRef? {
+        if ref.ayah > 1 { return AyahRef(surah: ref.surah, ayah: ref.ayah - 1) }
+        if ref.surah > 1 {
+            let prev = ref.surah - 1
+            return AyahRef(surah: prev, ayah: metadata.ayahCount(surah: prev))
+        }
+        return nil
+    }
+
+    /// Valid START ayahs: next sequential is available, OR isolated (single-ayah segment).
+    private func allowedStartAyahs(from available: Set<AyahRef>) -> Set<AyahRef> {
+        available.filter { ref in
+            let nextAvail = nextAyah(after: ref).map { available.contains($0) } ?? false
+            if nextAvail { return true }
+            // Isolated: no available neighbor in either direction
+            let prevAvail = previousAyah(before: ref).map { available.contains($0) } ?? false
+            return !prevAvail
+        }
+    }
+
+    /// Valid END ayahs: previous sequential is available, OR isolated.
+    private func allowedEndAyahs(from available: Set<AyahRef>) -> Set<AyahRef> {
+        available.filter { ref in
+            let prevAvail = previousAyah(before: ref).map { available.contains($0) } ?? false
+            if prevAvail { return true }
+            let nextAvail = nextAyah(after: ref).map { available.contains($0) } ?? false
+            return !nextAvail
+        }
+    }
+
+    /// Snaps start/end to valid allowed ayahs when reciter changes.
+    private func snapRangeToAvailableIfNeeded() {
+        let (allowedStart, allowedEnd) = allowedAyahRanges
+        if let allowed = allowedStart, !allowed.contains(AyahRef(surah: startSurah, ayah: startAyah)) {
+            if let first = allowed.sorted().first {
+                startSurah = first.surah; startAyah = first.ayah
+            }
+        }
+        if let allowed = allowedEnd, !allowed.contains(AyahRef(surah: endSurah, ayah: endAyah)) {
+            if let last = allowed.sorted().last {
+                endSurah = last.surah; endAyah = last.ayah
+            }
+        }
+        clampEndIfNeeded()
+    }
+
     private func showAfterRepeat(_ s: PlaybackSettings) -> Bool {
         guard (s.rangeRepeatCount ?? 1) != -1 else { return false }
-        let riwayah = s.safeRiwayah
-        if let id = s.selectedReciterId {
-            return allReciters.first(where: { $0.id == id })?.hasCDN == true
+        if let id = s.selectedReciterId, let reciter = allReciters.first(where: { $0.id == id }) {
+            // Local-only reciter: enable continuation only if fully annotated (all 6236 ayahs)
+            if !reciter.hasCDN {
+                return reciter.hasPersonalRecordings && availableAyahsForLocalReciter(reciter) == nil
+            }
+            return reciter.hasCDN
         }
+        let riwayah = s.safeRiwayah
         return allReciters.contains { $0.safeRiwayah == riwayah && $0.hasCDN }
     }
 
@@ -357,6 +546,10 @@ struct PlaybackSetupSheet: View {
 
     private func startPlayback() {
         guard let s = settings else { return }
+        // If "After Repeating" is hidden, the user can't change it — force it to disabled.
+        if !showAfterRepeat(s) {
+            s.afterRepeatAction = AfterRepeatAction.stop.rawValue
+        }
         let range = AyahRange(
             start: AyahRef(surah: startSurah, ayah: startAyah),
             end:   AyahRef(surah: endSurah,   ayah: endAyah)

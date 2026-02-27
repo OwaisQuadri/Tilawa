@@ -18,8 +18,7 @@ struct ReciterPickerView: View {
         let q = searchText.lowercased()
         return allReciters.filter {
             ($0.name?.lowercased().contains(q) == true) ||
-            $0.safeRiwayah.displayName.lowercased().contains(q) ||
-            ($0.style?.lowercased().contains(q) == true)
+            $0.safeRiwayah.displayName.lowercased().contains(q)
         }
     }
 
@@ -60,11 +59,6 @@ struct ReciterPickerView: View {
                                 Text(reciter.safeRiwayah.displayName)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
-                                if let style = reciter.style, !style.isEmpty {
-                                    Text("· \(style.capitalized)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
                                 if reciter.hasCDN {
                                     Label("CDN", systemImage: "icloud")
                                         .font(.caption2)
@@ -83,6 +77,7 @@ struct ReciterPickerView: View {
         .searchable(text: $searchText, prompt: "Search reciters")
         .navigationTitle("Assign Reciter")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { deleteOrphanReciters() }
         .sheet(isPresented: $showCreateSheet) {
             CreateReciterSheet { newReciter in
                 assign(newReciter)
@@ -94,6 +89,13 @@ struct ReciterPickerView: View {
         recording.reciter = reciter
         try? context.save()
         dismiss()
+    }
+
+    private func deleteOrphanReciters() {
+        let orphans = allReciters.filter { !$0.hasCDN && !$0.hasPersonalRecordings }
+        guard !orphans.isEmpty else { return }
+        orphans.forEach { context.delete($0) }
+        try? context.save()
     }
 }
 

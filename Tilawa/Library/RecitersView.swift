@@ -56,11 +56,6 @@ struct RecitersView: View {
                     Text(reciter.safeRiwayah.displayName)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    if let style = reciter.style, !style.isEmpty {
-                        Text("· \(style.capitalized)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                     Group {
                         if reciter.hasCDN {
                             Label("CDN", systemImage: "icloud")

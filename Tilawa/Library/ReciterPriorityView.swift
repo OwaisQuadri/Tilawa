@@ -19,43 +19,12 @@ struct ReciterPriorityView: View {
 
     private var settings: PlaybackSettings? { allSettings.first }
 
-    // Reciters that have no priority entry yet (only show reciters with actual audio sources)
-    private var unlistedReciters: [Reciter] {
-        let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
-        return allReciters.filter { r in
-            guard let id = r.id else { return false }
-            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
-        }.sorted { $0.safeName < $1.safeName }
-    }
-
     private let metadata = QuranMetadataService.shared
 
     var body: some View {
         List {
             defaultSection
             segmentsSection
-
-            if !unlistedReciters.isEmpty {
-                Section("Not in priority list") {
-                    ForEach(unlistedReciters, id: \.id) { reciter in
-                        Button {
-                            addToPriority(reciter)
-                        } label: {
-                            Label {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(reciter.safeName)
-                                        .foregroundStyle(.primary)
-                                    Text(reciter.safeRiwayah.displayName)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            } icon: {
-                                Image(systemName: "plus.circle")
-                            }
-                        }
-                    }
-                }
-            }
         }
         .navigationTitle("Reciter Priority")
         .navigationBarTitleDisplayMode(.inline)
@@ -79,17 +48,12 @@ struct ReciterPriorityView: View {
                 orderedEntries.move(fromOffsets: from, toOffset: to)
                 saveOrder()
             }
-            .onDelete { indexSet in
-                for i in indexSet {
-                    removeEntry(orderedEntries[i])
-                }
-            }
         } header: {
             Text("Default")
                 .font(.headline)
                 .textCase(nil)
         } footer: {
-            Text("Hold and drag to reorder. Top reciter plays first in Auto mode. Swipe left to remove a reciter from the Auto list. Removed reciters still exist in your library.")
+            Text("Hold and drag to reorder. Top reciter plays first in Auto mode.")
                 .font(.caption)
         }
         .environment(\.editMode, .constant(.active))
@@ -168,10 +132,7 @@ struct ReciterPriorityView: View {
                 HStack(spacing: 6) {
                     Text(reciter?.safeRiwayah.displayName ?? "")
                         .font(.caption)
-                    if let style = reciter?.style, !style.isEmpty {
-                        Text("· \(style.capitalized)")
-                            .font(.caption)
-                    }
+                        .foregroundStyle(.secondary)
                     if reciter?.hasPersonalRecordings == true {
                         Label("Personal", systemImage: "waveform.badge.mic")
                             .font(.caption2)
@@ -182,19 +143,29 @@ struct ReciterPriorityView: View {
             }
 
             Spacer()
-
-            // Enable/disable toggle
-            Toggle("", isOn: enabledBinding(entry))
-                .labelsHidden()
-                .controlSize(.small)
         }
-        .opacity(entry.isEnabled == false ? 0.4 : 1.0)
     }
 
     // MARK: - Default order management
 
     private func loadOrder() {
         guard let s = settings else { return }
+        orderedEntries = s.sortedReciterPriority
+
+        // Auto-add any reciter with audio that isn't in the list yet (at the bottom)
+        let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
+        let unlisted = allReciters.filter { r in
+            guard let id = r.id else { return false }
+            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
+        }
+        guard !unlisted.isEmpty else { return }
+        let maxOrder = orderedEntries.compactMap { $0.order }.max() ?? -1
+        for (i, reciter) in unlisted.enumerated() {
+            let entry = ReciterPriorityEntry(order: maxOrder + 1 + i, reciterId: reciter.id!)
+            context.insert(entry)
+            s.reciterPriority = (s.reciterPriority ?? []) + [entry]
+        }
+        try? context.save()
         orderedEntries = s.sortedReciterPriority
     }
 
@@ -203,31 +174,6 @@ struct ReciterPriorityView: View {
             entry.order = index
         }
         try? context.save()
-    }
-
-    private func addToPriority(_ reciter: Reciter) {
-        guard let reciterId = reciter.id, let s = settings else { return }
-        let maxOrder = (s.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
-        let entry = ReciterPriorityEntry(order: maxOrder + 1, reciterId: reciterId)
-        context.insert(entry)
-        s.reciterPriority = (s.reciterPriority ?? []) + [entry]
-        try? context.save()
-        loadOrder()
-    }
-
-    private func removeEntry(_ entry: ReciterPriorityEntry) {
-        guard let s = settings else { return }
-        orderedEntries.removeAll { $0.id == entry.id }
-        s.reciterPriority = (s.reciterPriority ?? []).filter { $0.id != entry.id }
-        context.delete(entry)
-        try? context.save()
-    }
-
-    private func enabledBinding(_ entry: ReciterPriorityEntry) -> Binding<Bool> {
-        Binding(
-            get: { entry.isEnabled ?? true },
-            set: { entry.isEnabled = $0; try? context.save() }
-        )
     }
 
     // MARK: - Segment management
@@ -246,6 +192,14 @@ struct ReciterPriorityView: View {
             order: maxOrder + 1
         )
         context.insert(override)
+        // Seed the segment's priority list from the current global priority
+        let seedEntries: [SegmentReciterEntry] = s.sortedReciterPriority.enumerated().map { index, entry in
+            let segEntry = SegmentReciterEntry(order: index, reciterId: entry.reciterId ?? UUID())
+            segEntry.isEnabled = entry.isEnabled
+            return segEntry
+        }
+        seedEntries.forEach { context.insert($0) }
+        override.reciterPriority = seedEntries
         s.segmentOverrides = (s.segmentOverrides ?? []) + [override]
         try? context.save()
         loadSegments()

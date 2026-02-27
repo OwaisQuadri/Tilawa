@@ -8,8 +8,8 @@ struct ManifestImportView: View {
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
+    @Query(sort: \Reciter.name) private var allReciters: [Reciter]
     @State private var vm = ManifestImportViewModel()
-
     var body: some View {
         NavigationStack {
             Form {
@@ -27,6 +27,7 @@ struct ManifestImportView: View {
 
                 // MARK: - Mode-specific content
                 switch vm.importMode {
+                case .presets:   presetsSection
                 case .jsonURL:   jsonURLSection
                 case .jsonFile:  jsonFileSection
                 case .urlFormat: urlFormatSection
@@ -65,10 +66,55 @@ struct ManifestImportView: View {
                     }
                 }
             }
-            // Navigate to download selector after successful import
+            // Navigate to availability check → download selector after successful import
             .navigationDestination(item: $vm.importedReciter) { reciter in
-                SurahDownloadSelectorView(reciter: reciter)
+                CDNAvailabilityView(reciter: reciter, dismissSheet: { dismiss() })
                     .onAppear { vm.addReciterToPriorityList(reciter, context: context) }
+            }
+        }
+    }
+
+    // MARK: - Presets section
+
+    private func isAlreadyAdded(_ preset: ReciterPreset) -> Bool {
+        allReciters.contains { $0.name == preset.name && $0.riwayah == preset.riwayah.rawValue }
+    }
+
+    @ViewBuilder
+    private var presetsSection: some View {
+        let grouped = Dictionary(grouping: ReciterPreset.all, by: \.riwayah)
+        let riwayahs = grouped.keys.sorted { $0.displayName < $1.displayName }
+        ForEach(riwayahs, id: \.self) { riwayah in
+            Section(riwayah.displayName) {
+                ForEach(grouped[riwayah] ?? []) { preset in
+                    let added = isAlreadyAdded(preset)
+                    Button {
+                        vm.selectedPreset = preset
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(preset.name)
+                                    .foregroundStyle(added ? .secondary : .primary)
+                                if added {
+                                    Text("Already added")
+                                        .font(.caption)
+                                        .foregroundStyle(.tertiary)
+                                }
+                            }
+                            Spacer()
+                            if added {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                                    .font(.caption)
+                            } else if vm.selectedPreset?.id == preset.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundStyle(.tint)
+                                    .fontWeight(.semibold)
+                            }
+                        }
+                    }
+                    .disabled(added)
+                }
             }
         }
     }
@@ -122,11 +168,6 @@ struct ManifestImportView: View {
                 }
             }
 
-            Picker("Style", selection: $vm.urlFormatStyle) {
-                Text("Murattal").tag("murattal")
-                Text("Mujawwad").tag("mujawwad")
-                Text("Muallim").tag("muallim")
-            }
         }
 
         Section {
@@ -174,6 +215,7 @@ struct ManifestImportView: View {
 
     private var canImport: Bool {
         switch vm.importMode {
+        case .presets:   return vm.selectedPreset.map { !isAlreadyAdded($0) } ?? false
         case .jsonURL:   return !vm.manifestURL.trimmingCharacters(in: .whitespaces).isEmpty
         case .jsonFile:  return vm.selectedJSONFileURL != nil
         case .urlFormat: return !vm.urlFormatName.trimmingCharacters(in: .whitespaces).isEmpty
@@ -183,6 +225,10 @@ struct ManifestImportView: View {
 
     private func performImport() {
         switch vm.importMode {
+        case .presets:
+            if let preset = vm.selectedPreset {
+                vm.importFromPreset(preset, context: context)
+            }
         case .jsonURL:
             Task { await vm.importFromURL(context: context) }
         case .jsonFile:
