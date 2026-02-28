@@ -5,6 +5,8 @@ import UniformTypeIdentifiers
 /// Sheet for adding a CDN reciter via JSON URL, JSON file upload, or URL format template.
 struct ManifestImportView: View {
 
+    var targetReciter: Reciter? = nil
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
 
@@ -42,7 +44,7 @@ struct ManifestImportView: View {
                     }
                 }
             }
-            .navigationTitle("Add CDN Reciter")
+            .navigationTitle(targetReciter != nil ? "Add CDN Source" : "Add CDN Reciter")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -66,11 +68,16 @@ struct ManifestImportView: View {
                     }
                 }
             }
-            // Navigate to availability check → download selector after successful import
             .navigationDestination(item: $vm.importedReciter) { reciter in
-                CDNAvailabilityView(reciter: reciter, source: vm.importedSource, dismissSheet: { dismiss() })
-                    .onAppear { vm.addReciterToPriorityList(reciter, context: context) }
+                CDNAvailabilityView(
+                    reciter: reciter,
+                    source: vm.importedSource,
+                    canReassign: targetReciter == nil,
+                    dismissSheet: { dismiss() }
+                )
+                .onAppear { vm.addReciterToPriorityList(reciter, context: context) }
             }
+            .onAppear { vm.targetReciter = targetReciter }
         }
     }
 
@@ -162,15 +169,24 @@ struct ManifestImportView: View {
 
     @ViewBuilder
     private var urlFormatSection: some View {
-        Section("Reciter Info") {
-            TextField("Reciter name", text: $vm.urlFormatName)
+        if targetReciter == nil {
+            Section("Reciter Info") {
+                TextField("Reciter name", text: $vm.urlFormatName)
 
-            Picker("Riwayah", selection: $vm.urlFormatRiwayah) {
-                ForEach(Riwayah.allCases, id: \.self) { r in
-                    Text(r.displayName).tag(r)
+                Picker("Riwayah", selection: $vm.urlFormatRiwayah) {
+                    ForEach(Riwayah.allCases, id: \.self) { r in
+                        Text(r.displayName).tag(r)
+                    }
                 }
             }
-
+        } else {
+            Section("Riwayah") {
+                Picker("Riwayah", selection: $vm.urlFormatRiwayah) {
+                    ForEach(Riwayah.allCases, id: \.self) { r in
+                        Text(r.displayName).tag(r)
+                    }
+                }
+            }
         }
 
         Section {
@@ -221,8 +237,9 @@ struct ManifestImportView: View {
         case .presets:   return vm.selectedPreset.map { !isAlreadyAdded($0) } ?? false
         case .jsonURL:   return !vm.manifestURL.trimmingCharacters(in: .whitespaces).isEmpty
         case .jsonFile:  return vm.selectedJSONFileURL != nil
-        case .urlFormat: return !vm.urlFormatName.trimmingCharacters(in: .whitespaces).isEmpty
-                              && !vm.urlFormatTemplate.trimmingCharacters(in: .whitespaces).isEmpty
+        case .urlFormat:
+            let nameOk = targetReciter != nil || !vm.urlFormatName.trimmingCharacters(in: .whitespaces).isEmpty
+            return nameOk && !vm.urlFormatTemplate.trimmingCharacters(in: .whitespaces).isEmpty
         }
     }
 

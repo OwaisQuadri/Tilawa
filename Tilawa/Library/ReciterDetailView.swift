@@ -28,6 +28,7 @@ struct ReciterDetailView: View {
 
     @State private var sources: [ReciterSourceItem] = []
     @State private var savedSourceOrder: [String] = []
+    @State private var showAddCDNSource = false
 
     private var reciterSegments: [RecordingSegment] {
         allSegments.filter { $0.recording?.reciter?.id == reciter.id }
@@ -39,16 +40,6 @@ struct ReciterDetailView: View {
 
     var body: some View {
         List {
-            if reciter.hasCDN {
-                Section {
-                    NavigationLink {
-                        SurahDownloadSelectorView(reciter: reciter, source: reciter.cdnSources?.first)
-                    } label: {
-                        Label("Download / Manage Surahs", systemImage: "arrow.down.circle")
-                    }
-                }
-            }
-
             let riwayahSummary = reciter.riwayahSummary
             if !riwayahSummary.isEmpty {
                 Section("Riwayaat") {
@@ -83,6 +74,11 @@ struct ReciterDetailView: View {
                         sources.move(fromOffsets: from, toOffset: to)
                     }
                 }
+                Button {
+                    showAddCDNSource = true
+                } label: {
+                    Label("Add CDN Source", systemImage: "plus.circle")
+                }
             } header: {
                 Text("Playback Priority")
             } footer: {
@@ -105,6 +101,9 @@ struct ReciterDetailView: View {
         }
         .onAppear { buildSources() }
         .onChange(of: reciterSegments.count) { _, _ in buildSources() }
+        .sheet(isPresented: $showAddCDNSource, onDismiss: buildSources) {
+            ManifestImportView(targetReciter: reciter)
+        }
     }
 
     // MARK: - Source row
@@ -115,20 +114,24 @@ struct ReciterDetailView: View {
         case .recording(let recording, let range):
             recordingRow(recording: recording, range: range, segments: item.segments)
         case .cdnSource(let source):
-            VStack(alignment: .leading, spacing: 2) {
-                let label = source.urlTemplate != nil ? "CDN · url template" : "CDN · manifest"
-                Label(label, systemImage: "icloud")
-                    .font(.body)
-                if let riwayah = source.riwayah.flatMap(Riwayah.init) {
-                    Text(riwayah.displayName)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                let preview = source.urlTemplate ?? source.baseURL ?? ""
-                if !preview.isEmpty {
-                    Text(String(preview.prefix(40)))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            NavigationLink {
+                SurahDownloadSelectorView(reciter: reciter, source: source)
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    let label = source.urlTemplate != nil ? "CDN · url template" : "CDN · manifest"
+                    Label(label, systemImage: "icloud")
+                        .font(.body)
+                    if let riwayah = source.riwayah.flatMap(Riwayah.init) {
+                        Text(riwayah.displayName)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    let preview = source.urlTemplate ?? source.baseURL ?? ""
+                    if !preview.isEmpty {
+                        Text(String(preview.prefix(40)))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
             .swipeActions(edge: .trailing) {
