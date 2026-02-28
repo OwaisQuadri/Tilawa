@@ -57,9 +57,11 @@ final class DownloadManager {
 
     /// Starts downloading `surahs` for `reciter`. Returns the job ID so callers can track progress.
     @discardableResult
-    func enqueue(surahs: [Int], reciter: Reciter, context: ModelContext) -> UUID {
+    func enqueue(surahs: [Int], reciter: Reciter, source: ReciterCDNSource? = nil, context: ModelContext) -> UUID {
         let jobId = UUID()
         guard !surahs.isEmpty, let _ = reciter.id else { return jobId }
+        let resolvedSource = source ?? reciter.cdnSources?.first
+        guard resolvedSource != nil else { return jobId }
 
         jobs[jobId] = DownloadJob(
             id: jobId,
@@ -96,8 +98,9 @@ final class DownloadManager {
                     }
                     let s = surah
                     group.addTask {
+                        guard let src = resolvedSource else { return (s, false) }
                         do {
-                            try await cache.downloadSurah(s, reciter: reciter, metadata: metadata) { p in
+                            try await cache.downloadSurah(s, reciter: reciter, source: src, metadata: metadata) { p in
                                 Task { @MainActor [weak self] in
                                     self?.jobs[jobId]?.surahProgress[s] = min(p, 0.99)
                                 }
@@ -115,7 +118,7 @@ final class DownloadManager {
             }
 
             // Refresh reciter's downloadedSurahsJSON to reflect what's actually on disk
-            await refreshCachedSurahs(for: reciter, context: context)
+            await refreshCachedSurahs(for: reciter, source: resolvedSource, context: context)
 
             // Fire local notification
             let job = jobs[jobId]
@@ -155,12 +158,13 @@ final class DownloadManager {
         }
     }
 
-    private func refreshCachedSurahs(for reciter: Reciter, context: ModelContext) async {
+    private func refreshCachedSurahs(for reciter: Reciter, source: ReciterCDNSource?, context: ModelContext) async {
+        guard let resolvedSource = source ?? reciter.cdnSources?.first else { return }
         let cache = AudioFileCache.shared
         let metadata = QuranMetadataService.shared
         var cached: [Int] = []
         for surah in 1...114 {
-            if await cache.isSurahFullyCached(surah, reciter: reciter, metadata: metadata) {
+            if await cache.isSurahFullyCached(surah, reciter: reciter, source: resolvedSource, metadata: metadata) {
                 cached.append(surah)
             }
         }

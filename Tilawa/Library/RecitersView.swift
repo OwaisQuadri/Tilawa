@@ -53,7 +53,7 @@ struct RecitersView: View {
                 Text(reciter.safeName)
                     .font(.body)
                 HStack(spacing: 6) {
-                    Text(reciter.safeRiwayah.displayName)
+                    Text(reciter.riwayahSummaryLabel)
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Group {

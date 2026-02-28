@@ -35,16 +35,15 @@ final class ManifestImportViewModel {
     var isLoading = false
     var errorMessage: String?
     var importedReciter: Reciter?
+    var importedSource: ReciterCDNSource?
 
     // MARK: - URL Format helpers
 
-    /// Live preview of the substituted URL using Al-Fatiha 1:1 as example.
     var urlFormatPreview: String {
         guard !urlFormatTemplate.isEmpty else { return "" }
         return AudioFileCache.substituteURLTemplate(urlFormatTemplate, surah: 1, ayah: 1)
     }
 
-    /// File extension inferred from the template URL (e.g. "mp3" from "…001001.mp3").
     var inferredFormat: String {
         let ext = (urlFormatTemplate as NSString).pathExtension.lowercased()
         let supported = ["mp3", "m4a", "opus", "wav"]
@@ -66,7 +65,9 @@ final class ManifestImportViewModel {
             guard (response as? HTTPURLResponse)?.statusCode == 200 else {
                 throw ReciterImportError.httpError((response as? HTTPURLResponse)?.statusCode ?? 0)
             }
-            importedReciter = try importManifestData(data, context: context)
+            let reciter = try importManifestData(data, context: context)
+            importedReciter = reciter
+            importedSource = reciter.cdnSources?.first
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -94,6 +95,7 @@ final class ManifestImportViewModel {
             try context.save()
             fileURL.stopAccessingSecurityScopedResource()
             importedReciter = reciter
+            importedSource = reciter.cdnSources?.first
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -130,25 +132,36 @@ final class ManifestImportViewModel {
         let format  = inferredFormat
 
         do {
-            let descriptor = FetchDescriptor<Reciter>(
-                predicate: #Predicate { $0.name == name && $0.riwayah == riwayah }
-            )
+            // Find or create reciter by name
+            let descriptor = FetchDescriptor<Reciter>(predicate: #Predicate { $0.name == name })
             let existing = try context.fetch(descriptor)
             let reciter  = existing.first ?? Reciter()
             if existing.isEmpty { context.insert(reciter) }
 
-            reciter.id               = reciter.id ?? UUID()
-            reciter.name             = name
-            reciter.riwayah          = riwayah
-            reciter.style            = urlFormatStyle
-            reciter.audioFileFormat  = format
-            reciter.namingPatternType = ReciterNamingPattern.urlTemplate.rawValue
-            reciter.audioURLTemplate = template
-            reciter.localCacheDirectory = reciter.id!.uuidString
-            reciter.isDownloaded     = false
+            reciter.id   = reciter.id ?? UUID()
+            reciter.name = name
+            reciter.style = urlFormatStyle
+            reciter.localCacheDirectory = reciter.localCacheDirectory ?? reciter.id!.uuidString
+            reciter.isDownloaded = false
+
+            // Find or create CDN source for this template
+            let existingSource = (reciter.cdnSources ?? []).first { $0.urlTemplate == template }
+            let source = existingSource ?? ReciterCDNSource()
+            if existingSource == nil {
+                source.id = UUID()
+                source.reciter = reciter
+                context.insert(source)
+                reciter.cdnSources = (reciter.cdnSources ?? []) + [source]
+            }
+
+            source.urlTemplate = template
+            source.riwayah = riwayah
+            source.audioFileFormat = format
+            source.namingPatternType = ReciterNamingPattern.urlTemplate.rawValue
 
             try context.save()
             importedReciter = reciter
+            importedSource = source
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -162,6 +175,8 @@ final class ManifestImportViewModel {
         errorMessage = nil
         do {
             let reciter: Reciter
+            let source: ReciterCDNSource?
+
             switch preset.source {
             case .manifestBaseURL(let baseURL, let namingPattern, let format, _):
                 let manifest = ReciterManifest(
@@ -180,31 +195,43 @@ final class ManifestImportViewModel {
                     )
                 )
                 reciter = try ReciterManifestImporter().createReciter(from: manifest, context: context)
+                source = reciter.cdnSources?.first { $0.baseURL == baseURL }
 
             case .urlTemplate(let template, let format):
-                let name    = preset.name
-                let riwayah = preset.riwayah.rawValue
-                let descriptor = FetchDescriptor<Reciter>(
-                    predicate: #Predicate { $0.name == name && $0.riwayah == riwayah }
-                )
+                let name = preset.name
+                let descriptor = FetchDescriptor<Reciter>(predicate: #Predicate { $0.name == name })
                 let existing = try context.fetch(descriptor)
                 let r = existing.first ?? Reciter()
                 if existing.isEmpty { context.insert(r) }
-                r.id                  = r.id ?? UUID()
-                r.name                = preset.name
-                r.shortName           = preset.shortName
-                r.riwayah             = preset.riwayah.rawValue
-                r.style               = preset.style
-                r.audioFileFormat     = format
-                r.namingPatternType   = ReciterNamingPattern.urlTemplate.rawValue
-                r.audioURLTemplate    = template
-                r.localCacheDirectory = r.id!.uuidString
-                r.isDownloaded        = false
+
+                r.id = r.id ?? UUID()
+                r.name = preset.name
+                r.shortName = preset.shortName
+                r.style = preset.style
+                r.localCacheDirectory = r.localCacheDirectory ?? r.id!.uuidString
+                r.isDownloaded = false
+
+                let existingSource = (r.cdnSources ?? []).first { $0.urlTemplate == template }
+                let src = existingSource ?? ReciterCDNSource()
+                if existingSource == nil {
+                    src.id = UUID()
+                    src.reciter = r
+                    context.insert(src)
+                    r.cdnSources = (r.cdnSources ?? []) + [src]
+                }
+
+                src.urlTemplate = template
+                src.riwayah = preset.riwayah.rawValue
+                src.audioFileFormat = format
+                src.namingPatternType = ReciterNamingPattern.urlTemplate.rawValue
+
                 reciter = r
+                source = src
             }
 
             try context.save()
             importedReciter = reciter
+            importedSource = source
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -220,7 +247,6 @@ final class ManifestImportViewModel {
         let descriptor = FetchDescriptor<PlaybackSettings>()
         guard let settings = try? context.fetch(descriptor).first else { return }
 
-        // Global priority: append at the bottom
         let alreadyInGlobal = (settings.reciterPriority ?? [])
             .contains { $0.reciterId == reciterId }
         if !alreadyInGlobal {
@@ -230,7 +256,6 @@ final class ManifestImportViewModel {
             settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
         }
 
-        // Segment overrides: append at the bottom of each segment's priority list
         for segment in settings.segmentOverrides ?? [] {
             let alreadyInSegment = (segment.reciterPriority ?? [])
                 .contains { $0.reciterId == reciterId }

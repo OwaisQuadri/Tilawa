@@ -20,6 +20,9 @@ final class RecordingSegment {
     var isCrosssurahSegment: Bool?
     var crossSurahJoinOffsetSeconds: Double?
 
+    // --- Riwayah (source of truth for personal recordings) ---
+    var riwayah: String?             // Riwayah.rawValue — inherited from recording.riwayah at creation time
+
     // --- Quality ---
     var isManuallyAnnotated: Bool?
     var confidenceScore: Double?  // 0.0–1.0
@@ -36,6 +39,7 @@ final class RecordingSegment {
         self.surahNumber = nil; self.ayahNumber = nil
         self.endSurahNumber = nil; self.endAyahNumber = nil
         self.isCrosssurahSegment = nil; self.crossSurahJoinOffsetSeconds = nil
+        self.riwayah = nil
         self.isManuallyAnnotated = nil; self.confidenceScore = nil
         self.userSortOrder = nil
     }
@@ -52,11 +56,15 @@ final class RecordingSegment {
         self.surahNumber = surah; self.ayahNumber = ayah
         self.endSurahNumber = surah; self.endAyahNumber = ayah
         self.isCrosssurahSegment = false
+        self.riwayah = recording.riwayah
         self.isManuallyAnnotated = false
         self.confidenceScore = 0.0
     }
 
     // MARK: - Safe computed properties
+    var safeRiwayah: Riwayah { Riwayah(rawValue: riwayah ?? "") ?? recording?.safeRiwayah ?? .hafs }
+    /// The reciter this segment belongs to (via its parent recording).
+    var reciter: Reciter? { recording?.reciter }
     var safeDuration: Double { (endOffsetSeconds ?? 0) - (startOffsetSeconds ?? 0) }
     var primaryAyahRef: AyahRef { AyahRef(surah: surahNumber ?? 1, ayah: ayahNumber ?? 1) }
     var endAyahRef: AyahRef {

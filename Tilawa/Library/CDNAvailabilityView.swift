@@ -6,6 +6,7 @@ import SwiftData
 struct CDNAvailabilityView: View {
 
     let reciter: Reciter
+    var source: ReciterCDNSource? = nil
     var dismissSheet: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var context
@@ -65,7 +66,7 @@ struct CDNAvailabilityView: View {
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .navigationDestination(isPresented: $navigateToDownload) {
-            SurahDownloadSelectorView(reciter: reciter, dismissSheet: dismissSheet)
+            SurahDownloadSelectorView(reciter: reciter, source: source, dismissSheet: dismissSheet)
         }
         .onAppear { startCheck() }
         .onDisappear { checkTask?.cancel() }
@@ -75,6 +76,7 @@ struct CDNAvailabilityView: View {
         checkTask = Task {
             let missing = await CDNAvailabilityChecker.shared.findMissingAyahs(
                 reciter: reciter,
+                source: source,
                 progress: { p in
                     Task { @MainActor in
                         self.progress = p

@@ -3,6 +3,10 @@ import SwiftData
 
 /// Sheet for configuring and starting a playback session.
 struct PlaybackSetupSheet: View {
+    /// When non-nil, seeds the range pickers from this value instead of the current Mushaf page.
+    /// Used when opening the sheet from the mini player to restore the active session range.
+    var initialRange: AyahRange? = nil
+
     @Environment(MushafViewModel.self) private var mushafVM
     @Environment(PlaybackViewModel.self) private var playback
     @Environment(\.modelContext) private var context
@@ -68,10 +72,9 @@ struct PlaybackSetupSheet: View {
                     }
                     .pickerStyle(.menu)
                     .onChange(of: s.safeRiwayah) { _, newRiwayah in
-                        // Reset reciter to Auto if it no longer matches the new riwayah
+                        // Reset reciter to Auto if it no longer has sources for the new riwayah
                         if let id = s.selectedReciterId,
-                           let reciter = allReciters.first(where: { $0.id == id }),
-                           reciter.safeRiwayah != newRiwayah {
+                           !matchingReciters(riwayah: newRiwayah).contains(where: { $0.id == id }) {
                             s.selectedReciterId = nil
                             save()
                         }
@@ -307,6 +310,12 @@ struct PlaybackSetupSheet: View {
     // MARK: - Helpers
 
     private func initializeRange() {
+        // Mini player / active session — restore the playing range
+        if let range = initialRange {
+            startSurah = range.start.surah;  startAyah = range.start.ayah
+            endSurah   = range.end.surah;    endAyah   = range.end.ayah
+            return
+        }
         // Long-press "Play Ayah" — seed range to exactly that one ayah, then consume
         if let ayah = mushafVM.longPressedAyahRef {
             startSurah = ayah.surah;  startAyah = ayah.ayah
@@ -341,8 +350,13 @@ struct PlaybackSetupSheet: View {
         return enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s).isEmpty
     }
 
+    /// Reciters that have at least one audio source for the given riwayah:
+    /// CDN reciters matched by their CDN riwayah, or personal-recording reciters with at least one matching segment.
     private func matchingReciters(riwayah: Riwayah) -> [Reciter] {
-        allReciters.filter { $0.safeRiwayah == riwayah }
+        allReciters.filter { r in
+            (r.hasCDN && (r.cdnSources ?? []).contains { Riwayah(rawValue: $0.riwayah ?? "") == riwayah }) ||
+            (r.recordings ?? []).flatMap { $0.segments ?? [] }.contains { $0.safeRiwayah == riwayah }
+        }
     }
 
     /// Reciters for the given riwayah that are enabled in the priority list (or not listed = enabled by default).
@@ -366,10 +380,9 @@ struct PlaybackSetupSheet: View {
         let available = availableRiwayat(for: s)
         guard !available.contains(s.safeRiwayah), let first = available.first else { return }
         s.selectedRiwayah = first.rawValue
-        // Clear specific reciter if it no longer matches the new riwayah
+        // Clear specific reciter if it no longer has sources for the new riwayah
         if let id = s.selectedReciterId,
-           let reciter = allReciters.first(where: { $0.id == id }),
-           reciter.safeRiwayah != first {
+           !matchingReciters(riwayah: first).contains(where: { $0.id == id }) {
             s.selectedReciterId = nil
         }
         save()
@@ -531,7 +544,9 @@ struct PlaybackSetupSheet: View {
             return reciter.hasCDN
         }
         let riwayah = s.safeRiwayah
-        return allReciters.contains { $0.safeRiwayah == riwayah && $0.hasCDN }
+        return allReciters.contains { r in
+            r.hasCDN && (r.cdnSources ?? []).contains { Riwayah(rawValue: $0.riwayah ?? "") == riwayah }
+        }
     }
 
     private func speedLabel(_ speed: Double) -> String {

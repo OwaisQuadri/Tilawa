@@ -19,6 +19,7 @@ struct TilawaApp: App {
             ReciterSegmentOverride.self,
             SegmentReciterEntry.self,
             Reciter.self,
+            ReciterCDNSource.self,
             Recording.self,
             RecordingSegment.self,
             AyahMarker.self,
@@ -60,11 +61,15 @@ struct TilawaApp: App {
 
         // Patch: fix the folder name typo (Minshawi_ → Minshawy_) saved by older builds
         var patched = false
-        for reciter in existing where reciter.remoteBaseURL?.contains("Minshawi_Murattal_128kbps") == true {
-            reciter.remoteBaseURL = reciter.remoteBaseURL?
-                .replacingOccurrences(of: "Minshawi_Murattal_128kbps", with: "Minshawy_Murattal_128kbps")
-            patched = true
-            print("🔧 Patched reciter URL: \(reciter.safeName) → \(reciter.remoteBaseURL ?? "")")
+        for reciter in existing {
+            for source in reciter.cdnSources ?? [] {
+                if source.baseURL?.contains("Minshawi_Murattal_128kbps") == true {
+                    source.baseURL = source.baseURL?
+                        .replacingOccurrences(of: "Minshawi_Murattal_128kbps", with: "Minshawy_Murattal_128kbps")
+                    patched = true
+                    print("🔧 Patched CDN source URL: \(reciter.safeName) → \(source.baseURL ?? "")")
+                }
+            }
         }
         if patched { try? context.save() }
 
@@ -89,7 +94,7 @@ struct TilawaApp: App {
             context.insert(settings)
 
             try context.save()
-            print("✅ Seeded reciter: \(reciter.safeName) (\(reciter.safeRiwayah.displayName)) id=\(reciter.id!)")
+            print("✅ Seeded reciter: \(reciter.safeName) (\(reciter.riwayahSummaryLabel)) id=\(reciter.id!)")
         } catch {
             assertionFailure("Failed to seed default reciter: \(error)")
         }

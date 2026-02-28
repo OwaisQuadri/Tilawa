@@ -3,20 +3,27 @@ import SwiftUI
 /// Compact persistent player bar shown above the tab bar during active playback.
 struct MiniPlayerBar: View {
     @Environment(PlaybackViewModel.self) private var playback
+    @State private var showingSettings = false
 
     var body: some View {
         HStack(spacing: 0) {
-            // Info area
-            VStack(alignment: .leading, spacing: 2) {
-                Text(playback.currentTrackTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .lineLimit(1)
-                Text(playback.currentReciterName)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
+            // Info area — tapping opens current playback settings
+            Button {
+                showingSettings = true
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(playback.currentTrackTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    Text(playback.currentReciterName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .buttonStyle(.plain)
 
             Spacer(minLength: 12)
 
@@ -61,5 +68,8 @@ struct MiniPlayerBar: View {
                 .stroke(.quaternary, lineWidth: 0.5)
         }
         .shadow(color: .black.opacity(0.1), radius: 10, y: 4)
+        .sheet(isPresented: $showingSettings) {
+            PlaybackSetupSheet(initialRange: playback.activeRange)
+        }
     }
 }
