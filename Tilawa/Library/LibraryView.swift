@@ -48,7 +48,13 @@ struct LibraryView: View {
             // Importing overlay
             .overlay {
                 if vm.isImporting {
-                    ProgressView("Importing…")
+                    let label: String = {
+                        if let p = vm.importProgress {
+                            return "Importing \(p.current) of \(p.total)…"
+                        }
+                        return "Importing…"
+                    }()
+                    ProgressView(label)
                         .padding(20)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
                 }
