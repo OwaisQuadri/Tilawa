@@ -300,7 +300,9 @@ final class PlaybackEngine {
 
         let isPersonal = item.isPersonalRecording
         eqNode.auAudioUnit.shouldBypassEffect = !isPersonal
-        playerNode.volume = normalizedVolume(for: audioFile, startFrame: startFrame, frameCount: frameCount, isPersonal: isPersonal)
+        playerNode.volume = isPersonal
+            ? normalizedVolume(for: audioFile, startFrame: startFrame, frameCount: frameCount)
+            : 1.0
 
         playerNode.scheduleSegment(
             audioFile,
@@ -313,13 +315,11 @@ final class PlaybackEngine {
         }
     }
 
-    /// Computes a volume gain to bring the segment's RMS level close to -18 dBFS.
-    /// Personal recordings: samples 3 windows (10 / 50 / 90 %) for a representative estimate.
-    /// CDN: quick single-window at the start.
+    /// Computes a volume gain to bring a personal recording's RMS level close to -18 dBFS.
+    /// Samples 3 windows (10 / 50 / 90 %) for a representative estimate.
     private func normalizedVolume(for audioFile: AVAudioFile,
                                    startFrame: AVAudioFramePosition,
-                                   frameCount: AVAudioFrameCount,
-                                   isPersonal: Bool) -> Float {
+                                   frameCount: AVAudioFrameCount) -> Float {
         let format = audioFile.processingFormat
         let sampleRate = Float(format.sampleRate)
         let channels = Int(format.channelCount)
@@ -345,15 +345,10 @@ final class PlaybackEngine {
 
         let windowFrames = AVAudioFrameCount(sampleRate * 0.5)   // 0.5 s per window
 
-        if isPersonal {
-            // 3 windows at 10 %, 50 %, 90 % of the segment
-            for ratio: Float in [0.1, 0.5, 0.9] {
-                let offset = AVAudioFramePosition(Float(frameCount) * ratio)
-                accumulate(from: startFrame + offset, windowFrames: windowFrames)
-            }
-        } else {
-            // CDN: one window at the start
-            accumulate(from: startFrame, windowFrames: min(AVAudioFrameCount(sampleRate), frameCount))
+        // 3 windows at 10 %, 50 %, 90 % of the segment
+        for ratio: Float in [0.1, 0.5, 0.9] {
+            let offset = AVAudioFramePosition(Float(frameCount) * ratio)
+            accumulate(from: startFrame + offset, windowFrames: windowFrames)
         }
 
         guard totalSamples > 0 else { return 1.0 }
