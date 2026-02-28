@@ -52,7 +52,13 @@ struct RecordingDetailView: View {
                 }
                 Picker("Riwayah", selection: Binding(
                     get: { recording.safeRiwayah },
-                    set: { recording.riwayah = $0.rawValue; try? context.save() }
+                    set: { newRiwayah in
+                        recording.riwayah = newRiwayah.rawValue
+                        for segment in recording.segments ?? [] {
+                            segment.riwayah = newRiwayah.rawValue
+                        }
+                        try? context.save()
+                    }
                 )) {
                     ForEach(Riwayah.allCases, id: \.self) { r in
                         Text(r.displayName).tag(r)

@@ -4,10 +4,10 @@ import AVFoundation
 /// Resolves the best available AyahAudioItem for a given ayah ref and session snapshot.
 ///
 /// Resolution order (per priority entry, in list order):
-///   1. Riwayah gate — personal segments use the recording's own riwayah (overrides reciter's);
-///      CDN sources use the reciter's riwayah.
+///   1. Riwayah gate — personal segments use the segment's own riwayah;
+///      CDN sources use the source's riwayah.
 ///   2. Personal recordings for this reciter (via RecordingLibraryService)
-///   3. CDN local cache (via AudioFileCache)
+///   3. CDN sources (one SourceAttempt per ReciterCDNSource, ordered by sortOrder)
 ///
 /// Returns nil if no audio is available → engine produces a silence gap.
 final class ReciterResolver {
@@ -23,14 +23,12 @@ final class ReciterResolver {
 
     func resolve(ref: AyahRef,
                  snapshot: PlaybackSettingsSnapshot) async -> AyahAudioItem? {
-        // Check if a segment override covers this ayah; use its priority list if so
         let matchingOverride = snapshot.segmentOverrides.first { $0.range.contains(ref) }
         let priorityList = matchingOverride.map(\.reciterPriority) ?? snapshot.reciterPriority
 
         for entry in priorityList {
             let reciter = entry.reciter
 
-            // Build unified source priority list
             struct SourceAttempt {
                 let effectiveOrder: Int
                 let tiebreaker: Int   // personal=0, cdnManifest=1, cdnTemplate=2
@@ -40,8 +38,7 @@ final class ReciterResolver {
 
             var attempts: [SourceAttempt] = []
 
-            // Personal segments — riwayah gate uses the recording's own riwayah,
-            // falling back to the reciter's riwayah for recordings that predate the field.
+            // Personal segments — gate on segment's own riwayah
             let allSegments = await libraryService.segments(for: ref, reciter: reciter)
             let sortedSegments = allSegments.sorted { lhs, rhs in
                 let lhsOrder = lhs.userSortOrder
@@ -66,35 +63,23 @@ final class ReciterResolver {
                     tiebreaker: 0,
                     subRank: rank,
                     resolve: { [weak self] in
-                        let segRiwayah = seg.recording?.safeRiwayah ?? reciter.safeRiwayah
-                        guard segRiwayah == snapshot.riwayah else { return nil }
+                        guard seg.safeRiwayah == snapshot.riwayah else { return nil }
                         return await self?.resolveSegmentItem(seg, ref: ref)
                     }
                 ))
             }
 
-            // CDN manifest — gate on reciter's riwayah (CDN is always one riwayah)
-            if reciter.remoteBaseURL != nil {
+            // CDN sources — one attempt per source, gated on the source's riwayah
+            for (idx, source) in (reciter.cdnSources ?? []).enumerated() {
+                let tiebreaker = source.urlTemplate != nil ? 2 : 1
                 attempts.append(SourceAttempt(
-                    effectiveOrder: reciter.cdnManifestOrder ?? Int.max,
-                    tiebreaker: 1,
-                    subRank: 0,
+                    effectiveOrder: source.sortOrder ?? Int.max,
+                    tiebreaker: tiebreaker,
+                    subRank: idx,
                     resolve: { [weak self] in
-                        guard reciter.safeRiwayah == snapshot.riwayah else { return nil }
-                        return await self?.resolveCDN(ref: ref, reciter: reciter)
-                    }
-                ))
-            }
-
-            // CDN url template — gate on reciter's riwayah
-            if reciter.audioURLTemplate != nil {
-                attempts.append(SourceAttempt(
-                    effectiveOrder: reciter.cdnTemplateOrder ?? Int.max,
-                    tiebreaker: 2,
-                    subRank: 0,
-                    resolve: { [weak self] in
-                        guard reciter.safeRiwayah == snapshot.riwayah else { return nil }
-                        return await self?.resolveCDN(ref: ref, reciter: reciter)
+                        guard let raw = source.riwayah,
+                              Riwayah(rawValue: raw) == snapshot.riwayah else { return nil }
+                        return await self?.resolveCDN(ref: ref, reciter: reciter, source: source)
                     }
                 ))
             }
@@ -139,17 +124,16 @@ final class ReciterResolver {
 
     // MARK: - CDN Resolution
 
-    private func resolveCDN(ref: AyahRef, reciter: Reciter) async -> AyahAudioItem? {
-        let localURL = await cache.localFileURL(for: ref, reciter: reciter)
+    private func resolveCDN(ref: AyahRef, reciter: Reciter, source: ReciterCDNSource) async -> AyahAudioItem? {
+        let localURL = await cache.localFileURL(for: ref, reciter: reciter, source: source)
 
         if !FileManager.default.fileExists(atPath: localURL.path) {
-            // Skip silently if this file returned 404 earlier this session — no log, no retry.
             if await cache.isMissing404(ref: ref, reciter: reciter) { return nil }
 
-            let remoteURL = await cache.remoteURL(for: ref, reciter: reciter)
+            let remoteURL = await cache.remoteURL(for: ref, source: source)
             print("   ⬇️ \(localURL.lastPathComponent) not cached — downloading from \(remoteURL?.absoluteString ?? "nil")")
             do {
-                try await cache.download(ref: ref, reciter: reciter)
+                try await cache.download(ref: ref, reciter: reciter, source: source)
                 print("   ✅ Downloaded \(localURL.lastPathComponent)")
             } catch {
                 print("   ❌ Download failed \(localURL.lastPathComponent): \(error.localizedDescription)")
@@ -163,7 +147,7 @@ final class ReciterResolver {
         return AyahAudioItem(
             id: UUID(),
             ayahRef: ref,
-            endAyahRef: ref,   // CDN files are always single-ayah
+            endAyahRef: ref,
             audioURL: localURL,
             startOffset: 0,
             endOffset: duration,
@@ -175,10 +159,6 @@ final class ReciterResolver {
 
     // MARK: - Local storage
 
-    /// Returns the local Documents URL for a recording storage path.
-    /// Audio files are stored in Documents/TilawaRecordings/.
-    /// iCloud Drive (ubiquity container) sync is deferred — it requires the
-    /// com.apple.developer.ubiquity-container-identifiers entitlement in addition to CloudKit.
     private func ubiquityURL(for storagePath: String) -> URL? {
         FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?
             .appendingPathComponent("TilawaRecordings")

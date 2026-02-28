@@ -68,7 +68,7 @@ struct ManifestImportView: View {
             }
             // Navigate to availability check → download selector after successful import
             .navigationDestination(item: $vm.importedReciter) { reciter in
-                CDNAvailabilityView(reciter: reciter, dismissSheet: { dismiss() })
+                CDNAvailabilityView(reciter: reciter, source: vm.importedSource, dismissSheet: { dismiss() })
                     .onAppear { vm.addReciterToPriorityList(reciter, context: context) }
             }
         }
@@ -77,7 +77,10 @@ struct ManifestImportView: View {
     // MARK: - Presets section
 
     private func isAlreadyAdded(_ preset: ReciterPreset) -> Bool {
-        allReciters.contains { $0.name == preset.name && $0.riwayah == preset.riwayah.rawValue }
+        allReciters.contains { r in
+            r.name == preset.name &&
+            (r.cdnSources ?? []).contains { $0.riwayah == preset.riwayah.rawValue }
+        }
     }
 
     @ViewBuilder

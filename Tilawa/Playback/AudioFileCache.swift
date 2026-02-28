@@ -14,38 +14,38 @@ actor AudioFileCache {
     // MARK: - URL Construction
 
     /// Returns the local cache URL for an ayah audio file (may not exist yet).
-    func localFileURL(for ref: AyahRef, reciter: Reciter) -> URL {
+    func localFileURL(for ref: AyahRef, reciter: Reciter, source: ReciterCDNSource) -> URL {
         let cacheDir = cacheDirectory(for: reciter)
-        let filename = audioFilename(for: ref, reciter: reciter)
+        let filename = audioFilename(for: ref, source: source)
         return cacheDir.appendingPathComponent(filename)
     }
 
-    /// Returns the remote CDN URL for an ayah, or nil if the reciter has no CDN configured.
-    func remoteURL(for ref: AyahRef, reciter: Reciter) -> URL? {
-        if reciter.namingPattern == .urlTemplate {
-            guard let template = reciter.audioURLTemplate else { return nil }
+    /// Returns the remote CDN URL for an ayah, or nil if the source has no CDN configured.
+    func remoteURL(for ref: AyahRef, source: ReciterCDNSource) -> URL? {
+        if source.namingPattern == .urlTemplate {
+            guard let template = source.urlTemplate else { return nil }
             let urlString = Self.substituteURLTemplate(template, surah: ref.surah, ayah: ref.ayah)
             return URL(string: urlString)
         }
-        guard let base = reciter.remoteBaseURL,
+        guard let base = source.baseURL,
               let baseURL = URL(string: base) else { return nil }
-        let filename = audioFilename(for: ref, reciter: reciter)
+        let filename = audioFilename(for: ref, source: source)
         return baseURL.appendingPathComponent(filename)
     }
 
     // MARK: - Cache Checks
 
-    func isFileCached(ref: AyahRef, reciter: Reciter) -> Bool {
-        let url = localFileURL(for: ref, reciter: reciter)
+    func isFileCached(ref: AyahRef, reciter: Reciter, source: ReciterCDNSource) -> Bool {
+        let url = localFileURL(for: ref, reciter: reciter, source: source)
         return fileManager.fileExists(atPath: url.path)
     }
 
-    func isSurahFullyCached(_ surah: Int, reciter: Reciter,
+    func isSurahFullyCached(_ surah: Int, reciter: Reciter, source: ReciterCDNSource,
                              metadata: QuranMetadataService) -> Bool {
         let count = metadata.ayahCount(surah: surah)
         guard count > 0 else { return false }
         return (1...count).allSatisfy { ayah in
-            isFileCached(ref: AyahRef(surah: surah, ayah: ayah), reciter: reciter)
+            isFileCached(ref: AyahRef(surah: surah, ayah: ayah), reciter: reciter, source: source)
         }
     }
 
@@ -57,18 +57,18 @@ actor AudioFileCache {
     }
 
     /// Downloads a single ayah's audio file. No-ops if already cached, downloading, or known 404.
-    func download(ref: AyahRef, reciter: Reciter) async throws {
+    func download(ref: AyahRef, reciter: Reciter, source: ReciterCDNSource) async throws {
         let key = cacheKey(ref: ref, reciter: reciter)
-        guard !isFileCached(ref: ref, reciter: reciter),
+        guard !isFileCached(ref: ref, reciter: reciter, source: source),
               !activeDownloads.contains(key),
               !knownMissing404s.contains(key) else { return }
 
-        guard let remoteURL = remoteURL(for: ref, reciter: reciter) else { return }
+        guard let remoteURL = remoteURL(for: ref, source: source) else { return }
 
         activeDownloads.insert(key)
         defer { activeDownloads.remove(key) }
 
-        let destURL = localFileURL(for: ref, reciter: reciter)
+        let destURL = localFileURL(for: ref, reciter: reciter, source: source)
         try ensureCacheDirectoryExists(for: reciter)
 
         let (tempURL, response) = try await URLSession.shared.download(from: remoteURL)
@@ -91,13 +91,14 @@ actor AudioFileCache {
     /// Reports progress via the `progress` closure (0.0–1.0).
     func downloadSurah(_ surah: Int,
                        reciter: Reciter,
+                       source: ReciterCDNSource,
                        metadata: QuranMetadataService,
                        progress: (@Sendable (Double) -> Void)? = nil) async throws {
         let count = metadata.ayahCount(surah: surah)
         guard count > 0 else { return }
 
         let refs = (1...count).map { AyahRef(surah: surah, ayah: $0) }
-            .filter { !isFileCached(ref: $0, reciter: reciter) }
+            .filter { !isFileCached(ref: $0, reciter: reciter, source: source) }
 
         guard !refs.isEmpty else {
             progress?(1.0)
@@ -122,7 +123,7 @@ actor AudioFileCache {
                 }
                 group.addTask { [weak self] in
                     guard let self else { return }
-                    try? await self.download(ref: ref, reciter: reciter)
+                    try? await self.download(ref: ref, reciter: reciter, source: source)
                 }
                 inflight += 1
             }
@@ -183,21 +184,17 @@ actor AudioFileCache {
             .appendingPathComponent("TilawaAudio")
     }
 
-    private func audioFilename(for ref: AyahRef, reciter: Reciter) -> String {
-        let format = reciter.audioFileFormat ?? "mp3"
-        switch reciter.namingPattern {
-        case .surahAyah:
+    private func audioFilename(for ref: AyahRef, source: ReciterCDNSource) -> String {
+        let format = source.audioFileFormat ?? "mp3"
+        switch source.namingPattern {
+        case .surahAyah, .urlTemplate:
+            // urlTemplate uses surahAyah format for local cache filenames
             let surah = String(format: "%03d", ref.surah)
             let ayah  = String(format: "%03d", ref.ayah)
             return "\(surah)\(ayah).\(format)"
         case .sequential:
             let index = sequentialIndex(for: ref)
             return "\(index).\(format)"
-        case .urlTemplate:
-            // Use surahAyah format for local cache filenames regardless of remote URL structure.
-            let surah = String(format: "%03d", ref.surah)
-            let ayah  = String(format: "%03d", ref.ayah)
-            return "\(surah)\(ayah).\(format)"
         }
     }
 

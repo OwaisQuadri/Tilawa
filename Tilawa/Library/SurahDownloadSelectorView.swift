@@ -6,6 +6,7 @@ import SwiftData
 struct SurahDownloadSelectorView: View {
 
     let reciter: Reciter
+    var source: ReciterCDNSource? = nil
     var dismissSheet: (() -> Void)? = nil
 
     @Environment(\.modelContext) private var context
@@ -194,6 +195,7 @@ struct SurahDownloadSelectorView: View {
         let jobId = dm.enqueue(
             surahs: Array(selectedSurahs).sorted(),
             reciter: reciter,
+            source: source,
             context: context
         )
         currentJobId = jobId

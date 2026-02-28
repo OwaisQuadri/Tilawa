@@ -16,10 +16,17 @@ actor CDNAvailabilityChecker {
     ///
     /// - Parameters:
     ///   - reciter: The CDN reciter to check.
+    ///   - source: The specific CDN source to probe. Falls back to the first CDN source if nil.
     ///   - progress: Called with 0.0–1.0 as checking proceeds (may be on any thread).
     /// - Returns: Array of `AyahRef` values that returned a non-200 or failed response.
     func findMissingAyahs(reciter: Reciter,
+                          source: ReciterCDNSource?,
                           progress: @Sendable (Double) -> Void) async -> [AyahRef] {
+        guard let resolvedSource = source ?? reciter.cdnSources?.first else {
+            progress(1.0)
+            return []
+        }
+
         let refs = allAyahRefs()
         let total = refs.count
         var missing: [AyahRef] = []
@@ -38,7 +45,7 @@ actor CDNAvailabilityChecker {
                     }
                 }
                 group.addTask {
-                    let available = await Self.probe(ref: ref, reciter: reciter)
+                    let available = await Self.probe(ref: ref, source: resolvedSource)
                     return (ref, available)
                 }
                 inflight += 1
@@ -67,8 +74,8 @@ actor CDNAvailabilityChecker {
 
     /// Sends a HEAD request for one ayah's CDN URL.
     /// Returns `true` if the server responds HTTP 200, `false` for any other result.
-    private static func probe(ref: AyahRef, reciter: Reciter) async -> Bool {
-        guard let url = await AudioFileCache.shared.remoteURL(for: ref, reciter: reciter) else {
+    private static func probe(ref: AyahRef, source: ReciterCDNSource) async -> Bool {
+        guard let url = await AudioFileCache.shared.remoteURL(for: ref, source: source) else {
             return false
         }
         var request = URLRequest(url: url, timeoutInterval: 10)

@@ -18,7 +18,7 @@ struct ReciterPickerView: View {
         let q = searchText.lowercased()
         return allReciters.filter {
             ($0.name?.lowercased().contains(q) == true) ||
-            $0.safeRiwayah.displayName.lowercased().contains(q)
+            $0.riwayahSummary.contains { $0.riwayah.displayName.lowercased().contains(q) }
         }
     }
 
@@ -56,7 +56,7 @@ struct ReciterPickerView: View {
                             Text(reciter.safeName)
                                 .foregroundStyle(.primary)
                             HStack(spacing: 4) {
-                                Text(reciter.safeRiwayah.displayName)
+                                Text(reciter.riwayahSummaryLabel)
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                                 if reciter.hasCDN {
@@ -108,17 +108,11 @@ struct CreateReciterSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
-    @State private var riwayah: Riwayah = .hafs
 
     var body: some View {
         NavigationStack {
             Form {
                 TextField("Name", text: $name)
-                Picker("Riwayah", selection: $riwayah) {
-                    ForEach(Riwayah.allCases, id: \.self) { r in
-                        Text(r.displayName).tag(r)
-                    }
-                }
             }
             .navigationTitle("New Reciter")
             .navigationBarTitleDisplayMode(.inline)
@@ -131,7 +125,6 @@ struct CreateReciterSheet: View {
                         let r = Reciter()
                         r.id = UUID()
                         r.name = name.trimmingCharacters(in: .whitespaces)
-                        r.riwayah = riwayah.rawValue
                         context.insert(r)
                         try? context.save()
                         onCreate(r)

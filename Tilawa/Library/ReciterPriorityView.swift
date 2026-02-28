@@ -130,7 +130,7 @@ struct ReciterPriorityView: View {
                 Text(reciter?.safeName ?? "Unknown")
                     .font(.body)
                 HStack(spacing: 6) {
-                    Text(reciter?.safeRiwayah.displayName ?? "")
+                    Text(reciter?.riwayahSummaryLabel ?? "")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     if reciter?.hasPersonalRecordings == true {
@@ -150,6 +150,22 @@ struct ReciterPriorityView: View {
 
     private func loadOrder() {
         guard let s = settings else { return }
+
+        // Purge stale entries pointing to reciters that no longer exist
+        let knownIds = Set(allReciters.compactMap { $0.id })
+        let stale = (s.reciterPriority ?? []).filter {
+            guard let id = $0.reciterId else { return true }
+            return !knownIds.contains(id)
+        }
+        if !stale.isEmpty {
+            stale.forEach { context.delete($0) }
+            s.reciterPriority = (s.reciterPriority ?? []).filter { entry in
+                guard let id = entry.reciterId else { return false }
+                return knownIds.contains(id)
+            }
+            try? context.save()
+        }
+
         orderedEntries = s.sortedReciterPriority
 
         // Auto-add any reciter with audio that isn't in the list yet (at the bottom)

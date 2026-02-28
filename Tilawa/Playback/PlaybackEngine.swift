@@ -17,6 +17,8 @@ final class PlaybackEngine {
     private(set) var currentIsPersonalRecording: Bool = false
     private(set) var unavailableAyah: AyahRef?
     private(set) var currentSpeed: Double = 1.0
+    /// The full range for the active playback session, if any.
+    var activeRange: AyahRange? { activeSnapshot?.range }
 
     // MARK: - AVAudio Graph
 
@@ -72,7 +74,7 @@ final class PlaybackEngine {
 
     /// Start playback for a range with a settings snapshot.
     func play(range: AyahRange, settings: PlaybackSettingsSnapshot) async {
-        stop()
+        stop(deactivateSession: false)
         // Re-activate audio session to ensure Now Playing eligibility
         try? AVAudioSession.sharedInstance().setActive(true)
         if !audioEngine.isRunning { try? audioEngine.start() }
@@ -106,7 +108,11 @@ final class PlaybackEngine {
         updateNowPlaying()
     }
 
-    func stop() {
+    /// Stop playback and reset all session state.
+    /// - Parameter deactivateSession: Pass `false` when stop is called internally before immediately
+    ///   starting a new session (e.g. from `play()`), so the rapid deactivate→activate cycle doesn't
+    ///   prevent the audio engine from restarting. Defaults to `true` for all user-facing stops.
+    func stop(deactivateSession: Bool = true) {
         sessionID = UUID()   // Invalidate any in-flight completion callbacks
         ayahStartDate = nil
         pausedElapsedTime = 0
@@ -122,6 +128,9 @@ final class PlaybackEngine {
         currentRangeRepetition = 0
         unavailableAyah = nil
         nowPlaying.clear()
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 
     func seek(to ayah: AyahRef) async {

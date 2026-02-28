@@ -5,8 +5,7 @@ import SwiftData
 
 private enum ReciterSourceKind {
     case recording(Recording, AyahRange)
-    case cdnManifest
-    case cdnTemplate
+    case cdnSource(ReciterCDNSource)
 }
 
 private struct ReciterSourceItem: Identifiable {
@@ -43,9 +42,31 @@ struct ReciterDetailView: View {
             if reciter.hasCDN {
                 Section {
                     NavigationLink {
-                        SurahDownloadSelectorView(reciter: reciter)
+                        SurahDownloadSelectorView(reciter: reciter, source: reciter.cdnSources?.first)
                     } label: {
                         Label("Download / Manage Surahs", systemImage: "arrow.down.circle")
+                    }
+                }
+            }
+
+            let riwayahSummary = reciter.riwayahSummary
+            if !riwayahSummary.isEmpty {
+                Section("Riwayaat") {
+                    ForEach(riwayahSummary, id: \.riwayah) { entry in
+                        HStack {
+                            Text(entry.riwayah.displayName)
+                            Spacer()
+                            if entry.segmentCount > 0 {
+                                Text("\(entry.segmentCount) segments")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            } else if reciter.hasCDN && (reciter.cdnSources ?? []).contains(where: { $0.riwayah.flatMap(Riwayah.init) == entry.riwayah }) {
+                                Label("CDN", systemImage: "icloud")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                    .labelStyle(.titleAndIcon)
+                            }
+                        }
                     }
                 }
             }
@@ -93,24 +114,28 @@ struct ReciterDetailView: View {
         switch item.kind {
         case .recording(let recording, let range):
             recordingRow(recording: recording, range: range, segments: item.segments)
-        case .cdnManifest:
+        case .cdnSource(let source):
             VStack(alignment: .leading, spacing: 2) {
-                Label("CDN · manifest", systemImage: "icloud")
+                let label = source.urlTemplate != nil ? "CDN · url template" : "CDN · manifest"
+                Label(label, systemImage: "icloud")
                     .font(.body)
-                if let url = reciter.remoteBaseURL {
-                    Text(String(url.prefix(40)))
+                if let riwayah = source.riwayah.flatMap(Riwayah.init) {
+                    Text(riwayah.displayName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                let preview = source.urlTemplate ?? source.baseURL ?? ""
+                if !preview.isEmpty {
+                    Text(String(preview.prefix(40)))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
-        case .cdnTemplate:
-            VStack(alignment: .leading, spacing: 2) {
-                Label("CDN · url template", systemImage: "icloud")
-                    .font(.body)
-                if let tmpl = reciter.audioURLTemplate {
-                    Text(String(tmpl.prefix(40)))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+            .swipeActions(edge: .trailing) {
+                Button(role: .destructive) {
+                    deleteCDNSource(source)
+                } label: {
+                    Label("Delete", systemImage: "trash")
                 }
             }
         }
@@ -227,14 +252,14 @@ struct ReciterDetailView: View {
             }
         }
 
-        if reciter.remoteBaseURL != nil {
-            items.append(ReciterSourceItem(id: "cdnManifest", kind: .cdnManifest, segments: [],
-                                           explicitOrder: reciter.cdnManifestOrder))
-        }
-
-        if reciter.audioURLTemplate != nil {
-            items.append(ReciterSourceItem(id: "cdnTemplate", kind: .cdnTemplate, segments: [],
-                                           explicitOrder: reciter.cdnTemplateOrder))
+        for source in reciter.cdnSources ?? [] {
+            let itemId = "cdn-\(source.id?.uuidString ?? UUID().uuidString)"
+            items.append(ReciterSourceItem(
+                id: itemId,
+                kind: .cdnSource(source),
+                segments: [],
+                explicitOrder: source.sortOrder
+            ))
         }
 
         items.sort { lhs, rhs in
@@ -252,10 +277,18 @@ struct ReciterDetailView: View {
 
     private func tiebreakerIndex(_ item: ReciterSourceItem) -> Int {
         switch item.kind {
-        case .recording:   return 0
-        case .cdnManifest: return 1
-        case .cdnTemplate: return 2
+        case .recording:              return 0
+        case .cdnSource(let source):  return source.urlTemplate != nil ? 2 : 1
         }
+    }
+
+    // MARK: - Delete CDN source
+
+    private func deleteCDNSource(_ source: ReciterCDNSource) {
+        reciter.cdnSources = (reciter.cdnSources ?? []).filter { $0.id != source.id }
+        context.delete(source)
+        try? context.save()
+        buildSources()
     }
 
     // MARK: - Save
@@ -265,10 +298,8 @@ struct ReciterDetailView: View {
             switch item.kind {
             case .recording:
                 for seg in item.segments { seg.userSortOrder = index }
-            case .cdnManifest:
-                reciter.cdnManifestOrder = index
-            case .cdnTemplate:
-                reciter.cdnTemplateOrder = index
+            case .cdnSource(let source):
+                source.sortOrder = index
             }
         }
         try? context.save()

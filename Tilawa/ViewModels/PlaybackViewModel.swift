@@ -22,6 +22,7 @@ final class PlaybackViewModel {
     var totalRangeRepetitions: Int { engine.totalRangeRepetitions }
     var isPlaying: Bool { engine.state == .playing }
     var unavailableAyah: AyahRef? { engine.unavailableAyah }
+    var activeRange: AyahRange? { engine.activeRange }
 
     // MARK: - Derived display properties
 
