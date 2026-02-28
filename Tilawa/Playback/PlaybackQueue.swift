@@ -15,23 +15,31 @@ enum PlaybackQueue {
                       metadata: QuranMetadataService) -> [AyahRef] {
         var queue: [AyahRef] = []
 
-        // Connection ayah before the range
+        // Connection ayah before the range (skip if not covered by a segment)
         if settings.connectionAyahBefore > 0,
-           let prev = metadata.ayah(before: range.start) {
+           let prev = metadata.ayah(before: range.start),
+           settings.coveredAyahs?.contains(prev) ?? true {
             queue.append(prev)
         }
 
-        // Main range
-        var cursor = range.start
-        while cursor <= range.end {
-            queue.append(cursor)
-            guard let next = metadata.ayah(after: cursor) else { break }
-            cursor = next
+        // Main range — when a covered set is present, use it to skip gaps between
+        // non-contiguous segments (avoids silence-storm over large ayah gaps).
+        if let covered = settings.coveredAyahs {
+            let inRange = covered.filter { $0 >= range.start && $0 <= range.end }.sorted()
+            queue.append(contentsOf: inRange)
+        } else {
+            var cursor = range.start
+            while cursor <= range.end {
+                queue.append(cursor)
+                guard let next = metadata.ayah(after: cursor) else { break }
+                cursor = next
+            }
         }
 
-        // Connection ayah after the range
+        // Connection ayah after the range (skip if not covered by a segment)
         if settings.connectionAyahAfter > 0,
-           let next = metadata.ayah(after: range.end) {
+           let next = metadata.ayah(after: range.end),
+           settings.coveredAyahs?.contains(next) ?? true {
             queue.append(next)
         }
 

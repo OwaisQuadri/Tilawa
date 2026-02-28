@@ -412,12 +412,58 @@ struct PlaybackSetupSheet: View {
     }
 
     /// Separate allowed sets for the FROM and TO pickers.
-    /// A valid start ayah must have its immediate successor also available (prevents starting at
-    /// the trailing edge of a block). A valid end ayah must have its predecessor also available.
-    /// Isolated single-ayah segments are allowed in both.
+    /// For local-only reciters, returns segment start/end boundaries directly — no heuristics.
+    /// For CDN/mixed reciters, uses the existing contiguous-block heuristic.
     private var allowedAyahRanges: (start: Set<AyahRef>?, end: Set<AyahRef>?) {
+        guard let s = settings else { return (nil, nil) }
+
+        // Specific local-only reciter — use segment boundaries for the selected riwayah
+        if let id = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == id }),
+           !reciter.hasCDN {
+            guard let (starts, ends) = segmentBoundariesForLocalReciter(reciter, riwayah: s.safeRiwayah)
+            else { return (nil, nil) }
+            return (starts, ends)
+        }
+
+        // Auto mode where ALL enabled reciters are local-only
+        if s.selectedReciterId == nil {
+            let enabled = enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s)
+            if !enabled.isEmpty && enabled.allSatisfy({ !$0.hasCDN }) {
+                var allStarts = Set<AyahRef>()
+                var allEnds   = Set<AyahRef>()
+                for reciter in enabled {
+                    if let (st, en) = segmentBoundariesForLocalReciter(reciter, riwayah: s.safeRiwayah) {
+                        allStarts.formUnion(st); allEnds.formUnion(en)
+                    }
+                }
+                return allStarts.isEmpty ? (nil, nil) : (allStarts, allEnds)
+            }
+        }
+
+        // CDN or mixed — use existing contiguous-block heuristics
         guard let available = availableAyahsForSelection else { return (nil, nil) }
         return (allowedStartAyahs(from: available), allowedEndAyahs(from: available))
+    }
+
+    /// Returns the start and end AyahRefs for each segment of a local reciter,
+    /// filtered to the given riwayah. Returns nil if no matching segments exist.
+    private func segmentBoundariesForLocalReciter(
+        _ reciter: Reciter,
+        riwayah: Riwayah
+    ) -> (starts: Set<AyahRef>, ends: Set<AyahRef>)? {
+        let segments = (reciter.recordings ?? []).flatMap { $0.segments ?? [] }
+            .filter { $0.safeRiwayah == riwayah }
+        guard !segments.isEmpty else { return nil }
+        var starts = Set<AyahRef>()
+        var ends   = Set<AyahRef>()
+        for seg in segments {
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { continue }
+            starts.insert(AyahRef(surah: ss, ayah: sa))
+            ends.insert(AyahRef(surah: seg.endSurahNumber ?? ss,
+                                ayah: seg.endAyahNumber  ?? sa))
+        }
+        return starts.isEmpty ? nil : (starts, ends)
     }
 
     private func availableAyahs(for reciter: Reciter) -> Set<AyahRef>? {
@@ -569,10 +615,61 @@ struct PlaybackSetupSheet: View {
             start: AyahRef(surah: startSurah, ayah: startAyah),
             end:   AyahRef(surah: endSurah,   ayah: endAyah)
         )
+        // Compute covered ayahs here on the main actor, where @Query-loaded model objects are
+        // live. Passing this into the engine avoids silent lazy-load failures that occur when
+        // SwiftData relationships are accessed off the main-actor context.
+        let coveredAyahs = coveredAyahsForPlayback(settings: s)
         let capturedPlayback = playback
         let capturedContext  = context
         dismiss()
-        Task { await capturedPlayback.play(range: range, settings: s, context: capturedContext) }
+        Task { await capturedPlayback.play(range: range, settings: s, context: capturedContext,
+                                           coveredAyahs: coveredAyahs) }
+    }
+
+    /// Expands all segment ranges for the active local-only reciter selection into a flat set
+    /// of ayah refs (filtered to the selected riwayah). Returns nil for CDN/mixed sessions.
+    private func coveredAyahsForPlayback(settings s: PlaybackSettings) -> Set<AyahRef>? {
+        let riwayah = s.safeRiwayah
+
+        // Specific local-only reciter
+        if let id = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == id }),
+           !reciter.hasCDN {
+            return expandSegments(of: reciter, riwayah: riwayah)
+        }
+
+        // Auto mode — only when ALL enabled reciters are local-only
+        let enabled = enabledMatchingReciters(riwayah: riwayah, settings: s)
+        guard !enabled.isEmpty && enabled.allSatisfy({ !$0.hasCDN }) else { return nil }
+        var union = Set<AyahRef>()
+        union.reserveCapacity(6236)
+        for reciter in enabled {
+            if let avail = expandSegments(of: reciter, riwayah: riwayah) {
+                union.formUnion(avail)
+            }
+        }
+        return union.isEmpty ? nil : union
+    }
+
+    /// Expands segments of a reciter matching `riwayah` into a flat AyahRef set.
+    private func expandSegments(of reciter: Reciter, riwayah: Riwayah) -> Set<AyahRef>? {
+        let segments = (reciter.recordings ?? []).flatMap { $0.segments ?? [] }
+            .filter { $0.safeRiwayah == riwayah }
+        guard !segments.isEmpty else { return nil }
+        var covered = Set<AyahRef>()
+        for seg in segments {
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { continue }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber  ?? sa
+            var cur = AyahRef(surah: ss, ayah: sa)
+            let end = AyahRef(surah: es, ayah: ea)
+            while cur <= end {
+                covered.insert(cur)
+                guard let next = nextAyah(after: cur) else { break }
+                cur = next
+            }
+        }
+        return covered.isEmpty ? nil : covered
     }
 
     // MARK: - Settings bindings
