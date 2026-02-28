@@ -12,7 +12,6 @@ struct AnnotationEditorView: View {
 
     @State private var vm: AnnotationEditorViewModel
     @State private var selectedMarker: AyahMarker?
-    @State private var showAutoDetectOptions = false
     @State private var saveError: Error?
     @State private var selectedTab: EditorTab = .tags
     @State private var autoAssignEnabled = false
@@ -273,15 +272,11 @@ struct AnnotationEditorView: View {
 
     private var markersList: some View {
         List {
-            if !vm.amplitudes.isEmpty {
-                autoDetectRow
-            }
-
             if recordingMarkers.isEmpty {
                 ContentUnavailableView(
                     "No Markers",
                     systemImage: "pin.slash",
-                    description: Text("Tap ＋ to place a marker at the current position, or use auto-detect.")
+                    description: Text("Tap ＋ to place a marker at the current position.")
                 )
                 .listRowBackground(Color.clear)
             } else {
@@ -296,33 +291,6 @@ struct AnnotationEditorView: View {
             }
         }
         .listStyle(.plain)
-    }
-
-    private var autoDetectRow: some View {
-        Section {
-            DisclosureGroup("Silence Detection", isExpanded: $showAutoDetectOptions) {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Threshold")
-                            .font(.caption)
-                        Slider(value: $vm.silenceThreshold, in: 0.01...0.15, step: 0.005)
-                        Text(String(format: "%.3f", vm.silenceThreshold))
-                            .font(.caption.monospacedDigit())
-                            .frame(width: 40)
-                    }
-                    Button {
-                        vm.runAutoDetect(markers: recordingMarkers, context: context)
-                    } label: {
-                        Label(vm.isRunningAutoDetect ? "Detecting…" : "Detect Silences",
-                              systemImage: "waveform.path.ecg")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(vm.isRunningAutoDetect)
-                }
-                .padding(.vertical, 4)
-            }
-        }
     }
 
     @ViewBuilder
