@@ -13,5 +13,6 @@ struct TilawaWidgetsBundle: WidgetBundle {
     var body: some Widget {
         TilawaWidgets()
         RecordingLiveActivity()
+        ImportLiveActivity()
     }
 }

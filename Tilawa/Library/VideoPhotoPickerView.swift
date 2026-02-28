@@ -11,7 +11,7 @@ struct VideoPhotoPickerView: UIViewControllerRepresentable {
     func makeUIViewController(context: Context) -> PHPickerViewController {
         var config = PHPickerConfiguration()
         config.filter = .videos
-        config.selectionLimit = 1
+        config.selectionLimit = 0
         let picker = PHPickerViewController(configuration: config)
         picker.delegate = context.coordinator
         return picker
@@ -32,21 +32,31 @@ struct VideoPhotoPickerView: UIViewControllerRepresentable {
 
         func picker(_ picker: PHPickerViewController, didFinishPicking results: [PHPickerResult]) {
             picker.dismiss(animated: true)
-            guard let provider = results.first?.itemProvider,
-                  provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) else { return }
+            guard !results.isEmpty else { return }
 
-            provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { [weak self] tempURL, error in
-                guard let self, let tempURL, error == nil else { return }
+            let group = DispatchGroup()
+            var stableURLs: [URL] = []
+            let lock = NSLock()
 
-                // Copy to a stable temp location before this block returns.
-                let stableURL = FileManager.default.temporaryDirectory
-                    .appendingPathComponent(tempURL.lastPathComponent)
-                try? FileManager.default.removeItem(at: stableURL)
-                guard (try? FileManager.default.copyItem(at: tempURL, to: stableURL)) != nil else { return }
-
-                DispatchQueue.main.async {
-                    self.onPick([stableURL])
+            for result in results {
+                let provider = result.itemProvider
+                guard provider.hasItemConformingToTypeIdentifier(UTType.movie.identifier) else { continue }
+                group.enter()
+                provider.loadFileRepresentation(forTypeIdentifier: UTType.movie.identifier) { tempURL, error in
+                    defer { group.leave() }
+                    guard let tempURL, error == nil else { return }
+                    // Use UUID prefix to avoid collisions when multiple files share a name.
+                    let stable = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("\(UUID().uuidString)_\(tempURL.lastPathComponent)")
+                    try? FileManager.default.removeItem(at: stable)
+                    guard (try? FileManager.default.copyItem(at: tempURL, to: stable)) != nil else { return }
+                    lock.lock(); stableURLs.append(stable); lock.unlock()
                 }
+            }
+
+            group.notify(queue: .main) { [weak self] in
+                guard !stableURLs.isEmpty else { return }
+                self?.onPick(stableURLs)
             }
         }
     }
