@@ -26,17 +26,11 @@ final class AnnotationEditorViewModel {
     private var positionUpdateTimer: Timer?
     private var segmentEndTime: Double?
 
-    // MARK: - Auto-detect
-
-    var silenceThreshold: Float = 0.04
-    var isRunningAutoDetect = false
-
     // MARK: - Waveform display
 
     /// Bucket count used for waveform analysis. Enough detail for a scrollable view.
     private let bucketCount = 1200
     private let analyzer = WaveformAnalyzer()
-    private let detector = SilenceDetector()
 
     init(recording: Recording) {
         self.recording = recording
@@ -104,37 +98,6 @@ final class AnnotationEditorViewModel {
             current = metadata.ayah(after: current) ?? current
         }
         try? context.save()
-    }
-
-    // MARK: - Auto-detect silences
-
-    func runAutoDetect(markers: [AyahMarker], context: ModelContext) {
-        guard !amplitudes.isEmpty else { return }
-        isRunningAutoDetect = true
-
-        var detector = SilenceDetector()
-        detector.silenceThreshold = silenceThreshold
-
-        let boundaries = detector.detectBoundaries(in: amplitudes)
-        let duration = recording.safeDuration
-
-        // Remove existing unconfirmed markers to avoid duplicates
-        for marker in markers where marker.isConfirmed == false {
-            context.delete(marker)
-        }
-
-        let confirmedCount = markers.filter { $0.isConfirmed == true }.count
-        for (i, bucket) in boundaries.enumerated() {
-            let seconds = detector.seconds(for: bucket,
-                                            totalBuckets: amplitudes.count,
-                                            duration: duration)
-            let marker = AyahMarker(recording: recording,
-                                    position: seconds,
-                                    index: confirmedCount + i)
-            context.insert(marker)
-        }
-        try? context.save()
-        isRunningAutoDetect = false
     }
 
     // MARK: - Save segments

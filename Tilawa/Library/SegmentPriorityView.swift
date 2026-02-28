@@ -10,11 +10,12 @@ struct SegmentPriorityView: View {
     let reciterId: UUID
 
     @Environment(\.modelContext) private var context
+    @Environment(\.editMode) private var isEditing
 
     @Query private var allSegments: [RecordingSegment]
 
     @State private var orderedSegments: [RecordingSegment] = []
-    @State private var isEditing = false
+
 
     init(surah: Int, ayah: Int, reciterId: UUID) {
         self.surah = surah
@@ -42,6 +43,7 @@ struct SegmentPriorityView: View {
                 }
                 .onMove { from, to in
                     orderedSegments.move(fromOffsets: from, toOffset: to)
+                    saveOrder()
                 }
             } header: {
                 Text("Drag to set priority. Top recording plays first.")
@@ -56,18 +58,10 @@ struct SegmentPriorityView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Reset to Default", role: .destructive) { resetOrder() }
                 EditButton()
             }
-            ToolbarItem(placement: .bottomBar) {
-                HStack {
-                    Button("Reset to Default", role: .destructive) { resetOrder() }
-                    Spacer()
-                    Button("Save") { saveOrder() }
-                        .fontWeight(.semibold)
-                }
-            }
         }
-        .environment(\.editMode, .constant(.active))
         .onAppear { loadOrder() }
         .onChange(of: relevantSegments.count) { _, _ in loadOrder() }
     }
@@ -92,16 +86,6 @@ struct SegmentPriorityView: View {
                 Text("\(timeString(segStart)) – \(timeString(segEnd))")
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(.secondary)
-
-                if segment.isManuallyAnnotated == true {
-                    Label("Manual", systemImage: "hand.point.up")
-                        .font(.caption2)
-                        .foregroundStyle(.blue)
-                } else if let score = segment.confidenceScore {
-                    Text(String(format: "%.0f%%", score * 100))
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
             }
 
             if segment.userSortOrder == nil {
