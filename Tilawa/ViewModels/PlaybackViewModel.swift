@@ -49,10 +49,14 @@ final class PlaybackViewModel {
     // MARK: - Convenience play methods
 
     /// Builds a PlaybackSettingsSnapshot from a PlaybackSettings @Model and starts playback.
+    /// `coveredAyahs` should be pre-computed on the main actor (e.g. from PlaybackSetupSheet)
+    /// for all-local-reciter sessions so PlaybackQueue can skip gap ayahs between segments.
     func play(range: AyahRange,
               settings: PlaybackSettings,
-              context: ModelContext) async {
-        let snapshot = buildSnapshot(range: range, settings: settings, context: context)
+              context: ModelContext,
+              coveredAyahs: Set<AyahRef>? = nil) async {
+        let snapshot = buildSnapshot(range: range, settings: settings, context: context,
+                                     coveredAyahs: coveredAyahs)
         await engine.play(range: range, settings: snapshot)
     }
 
@@ -74,9 +78,29 @@ final class PlaybackViewModel {
             gapBetweenAyaatMs: 0,
             reciterPriority: [ReciterSnapshot(reciterId: reciter.id ?? UUID(), reciter: reciter)],
             segmentOverrides: [],
-            riwayah: recording.safeRiwayah
+            riwayah: recording.safeRiwayah,
+            coveredAyahs: coveredAyahsForRecording(recording)
         )
         await engine.play(range: range, settings: snapshot)
+    }
+
+    private func coveredAyahsForRecording(_ recording: Recording) -> Set<AyahRef>? {
+        let segments = recording.segments ?? []
+        guard !segments.isEmpty else { return nil }
+        var covered = Set<AyahRef>()
+        for seg in segments {
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { continue }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber ?? sa
+            var cur = AyahRef(surah: ss, ayah: sa)
+            let end = AyahRef(surah: es, ayah: ea)
+            while cur <= end {
+                covered.insert(cur)
+                guard let next = metadata.ayah(after: cur) else { break }
+                cur = next
+            }
+        }
+        return covered.isEmpty ? nil : covered
     }
 
     func pause()  { engine.pause() }
@@ -104,7 +128,8 @@ final class PlaybackViewModel {
 
     private func buildSnapshot(range: AyahRange,
                                 settings: PlaybackSettings,
-                                context: ModelContext) -> PlaybackSettingsSnapshot {
+                                context: ModelContext,
+                                coveredAyahs: Set<AyahRef>? = nil) -> PlaybackSettingsSnapshot {
         let priorityEntries = settings.sortedReciterPriority
         var reciterSnapshots: [ReciterSnapshot] = []
 
@@ -114,12 +139,20 @@ final class PlaybackViewModel {
             // Specific reciter selected — use only that one
             reciterSnapshots = [ReciterSnapshot(reciterId: pinnedId, reciter: reciter)]
         } else {
-            // Auto — use full priority list
+            // Auto — filter to reciters that have at least one source for the selected riwayah,
+            // matching the view's matchingReciters(riwayah:) logic.
+            let targetRiwayah = settings.safeRiwayah
             for entry in priorityEntries {
                 guard let reciterId = entry.reciterId else { continue }
-                if let reciter = allReciters.first(where: { $0.id == reciterId }) {
-                    reciterSnapshots.append(ReciterSnapshot(reciterId: reciterId, reciter: reciter))
+                guard let reciter = allReciters.first(where: { $0.id == reciterId }) else { continue }
+                let hasCDNSource = (reciter.cdnSources ?? []).contains {
+                    Riwayah(rawValue: $0.riwayah ?? "") == targetRiwayah
                 }
+                let hasSegment = (reciter.recordings ?? [])
+                    .flatMap { $0.segments ?? [] }
+                    .contains { $0.safeRiwayah == targetRiwayah }
+                guard hasCDNSource || hasSegment else { continue }
+                reciterSnapshots.append(ReciterSnapshot(reciterId: reciterId, reciter: reciter))
             }
         }
 
@@ -148,7 +181,8 @@ final class PlaybackViewModel {
             gapBetweenAyaatMs: settings.safeGapMs,
             reciterPriority: reciterSnapshots,
             segmentOverrides: segmentOverrideSnapshots,
-            riwayah: settings.safeRiwayah
+            riwayah: settings.safeRiwayah,
+            coveredAyahs: coveredAyahs
         )
     }
 }
