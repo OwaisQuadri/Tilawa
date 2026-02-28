@@ -37,6 +37,9 @@ final class ManifestImportViewModel {
     var importedReciter: Reciter?
     var importedSource: ReciterCDNSource?
 
+    /// When set, imported CDN sources are moved to this reciter instead of the one created/found by name.
+    var targetReciter: Reciter?
+
     // MARK: - URL Format helpers
 
     var urlFormatPreview: String {
@@ -68,6 +71,7 @@ final class ManifestImportViewModel {
             let reciter = try importManifestData(data, context: context)
             importedReciter = reciter
             importedSource = reciter.cdnSources?.first
+            reassignToTargetIfNeeded(context)
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -96,6 +100,7 @@ final class ManifestImportViewModel {
             fileURL.stopAccessingSecurityScopedResource()
             importedReciter = reciter
             importedSource = reciter.cdnSources?.first
+            reassignToTargetIfNeeded(context)
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -132,14 +137,15 @@ final class ManifestImportViewModel {
         let format  = inferredFormat
 
         do {
-            // Find or create reciter by name
-            let descriptor = FetchDescriptor<Reciter>(predicate: #Predicate { $0.name == name })
+            // Find or create reciter by name (use targetReciter's name if set)
+            let resolvedName = targetReciter?.safeName ?? name
+            let descriptor = FetchDescriptor<Reciter>(predicate: #Predicate { $0.name == resolvedName })
             let existing = try context.fetch(descriptor)
             let reciter  = existing.first ?? Reciter()
             if existing.isEmpty { context.insert(reciter) }
 
             reciter.id   = reciter.id ?? UUID()
-            reciter.name = name
+            reciter.name = resolvedName
             reciter.style = urlFormatStyle
             reciter.localCacheDirectory = reciter.localCacheDirectory ?? reciter.id!.uuidString
             reciter.isDownloaded = false
@@ -162,6 +168,7 @@ final class ManifestImportViewModel {
             try context.save()
             importedReciter = reciter
             importedSource = source
+            reassignToTargetIfNeeded(context)
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -232,6 +239,7 @@ final class ManifestImportViewModel {
             try context.save()
             importedReciter = reciter
             importedSource = source
+            reassignToTargetIfNeeded(context)
         } catch let e as ManifestImportError {
             errorMessage = e.errorDescription
         } catch {
@@ -270,6 +278,23 @@ final class ManifestImportViewModel {
     }
 
     // MARK: - Helpers
+
+    /// If `targetReciter` is set and the import created a different reciter, moves the CDN source
+    /// to `targetReciter` and deletes the temp reciter if it's now empty.
+    private func reassignToTargetIfNeeded(_ context: ModelContext) {
+        guard let target = targetReciter,
+              let created = importedReciter,
+              created.id != target.id,
+              let source = importedSource else { return }
+        source.reciter = target
+        target.cdnSources = (target.cdnSources ?? []) + [source]
+        created.cdnSources = (created.cdnSources ?? []).filter { $0.id != source.id }
+        if (created.cdnSources ?? []).isEmpty && (created.recordings ?? []).isEmpty {
+            context.delete(created)
+        }
+        importedReciter = target
+        try? context.save()
+    }
 
     private func importManifestData(_ data: Data, context: ModelContext) throws -> Reciter {
         let tempURL = FileManager.default.temporaryDirectory
