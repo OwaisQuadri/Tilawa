@@ -1,0 +1,7 @@
+- Browse and play Quran recitations from a selection of reciters.
+- Download reciter audio for a surah to listen offline.
+- Import personal recordings from audio or video files via the Library tab.
+- Import audio from YouTube by pasting a video link — download progress is shown inline with a stop button to cancel.
+- Annotate a recording with ayah markers to navigate by verse during playback.
+- Manage which reciters appear in playback using the priority list in the Library tab.
+- Switch reciters and surahs from the playback screen without leaving the player.

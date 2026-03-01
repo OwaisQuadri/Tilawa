@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		CD3692642F53A9030028AE28 /* YouTubeKit in Frameworks */ = {isa = PBXBuildFile; productRef = CD3692632F53A9030028AE28 /* YouTubeKit */; };
 		CD5C75712F514C6B0030B4DC /* WidgetKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD5C75702F514C6B0030B4DC /* WidgetKit.framework */; };
 		CD5C75732F514C6B0030B4DC /* SwiftUI.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = CD5C75722F514C6B0030B4DC /* SwiftUI.framework */; };
 		CD5C75802F514C6B0030B4DC /* TilawaWidgetsExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = CD5C756E2F514C6B0030B4DC /* TilawaWidgetsExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
@@ -119,6 +120,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				CD3692642F53A9030028AE28 /* YouTubeKit in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -215,6 +217,7 @@
 			);
 			name = Tilawa;
 			packageProductDependencies = (
+				CD3692632F53A9030028AE28 /* YouTubeKit */,
 			);
 			productName = Tilawa;
 			productReference = CD5E27422F4E1007007C0C96 /* Tilawa.app */;
@@ -301,6 +304,9 @@
 			);
 			mainGroup = CD5E27392F4E1007007C0C96;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				CD3692622F53A9030028AE28 /* XCRemoteSwiftPackageReference "YouTubeKit" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = CD5E27432F4E1007007C0C96 /* Products */;
 			projectDirPath = "";
@@ -819,6 +825,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		CD3692622F53A9030028AE28 /* XCRemoteSwiftPackageReference "YouTubeKit" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/alexeichhorn/YouTubeKit";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 0.4.4;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		CD3692632F53A9030028AE28 /* YouTubeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = CD3692622F53A9030028AE28 /* XCRemoteSwiftPackageReference "YouTubeKit" */;
+			productName = YouTubeKit;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = CD5E273A2F4E1007007C0C96 /* Project object */;
 }

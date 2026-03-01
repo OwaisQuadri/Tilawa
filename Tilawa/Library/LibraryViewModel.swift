@@ -11,13 +11,18 @@ final class LibraryViewModel {
 
     var isShowingAudioPicker = false
     var isShowingVideoPicker = false
+    var isShowingYouTubeImport = false
     var pendingAnnotationRecording: Recording?
     var importError: String?
     var isImporting = false
     var importProgress: (current: Int, total: Int, fileName: String)?
+    /// In-progress and failed YouTube imports shown as inline rows in the library.
+    var pendingYouTubeImports: [YouTubeImportTask] = []
 
     private let importer = AudioImporter()
     private var importActivity: Activity<ImportActivityAttributes>?
+    /// Active download tasks keyed by YouTubeImportTask.id; used for pause/cancel.
+    private var downloadTasks: [UUID: Task<Void, Never>] = [:]
 
     // MARK: - Import audio files
 
@@ -75,6 +80,65 @@ final class LibraryViewModel {
         endImportActivity()
         endBackgroundTask(bgTask)
         if !errors.isEmpty { importError = errors.joined(separator: "\n") }
+    }
+
+    // MARK: - Import from YouTube
+
+    func importFromYouTube(urlString: String, context: ModelContext) {
+        let task = YouTubeImportTask(urlString: urlString)
+        pendingYouTubeImports.append(task)
+        startDownload(for: task, context: context)
+    }
+
+    func removePendingYouTubeImport(_ task: YouTubeImportTask) {
+        downloadTasks[task.id]?.cancel()
+        downloadTasks[task.id] = nil
+        pendingYouTubeImports.removeAll { $0.id == task.id }
+    }
+
+    private func startDownload(for task: YouTubeImportTask, context: ModelContext) {
+        let taskID = task.id
+        let urlString = task.urlString
+
+        let downloadTask = Task {
+            do {
+                let (tempURL, videoID, title) = try await YouTubeAudioImporter().downloadAudio(
+                    from: urlString,
+                    onTitle: { fetchedTitle in
+                        Task { @MainActor [weak self] in
+                            self?.pendingYouTubeImports
+                                .first(where: { $0.id == taskID })?
+                                .title = fetchedTitle
+                        }
+                    },
+                    onProgress: { progress in
+                        Task { @MainActor [weak self] in
+                            guard let task = self?.pendingYouTubeImports
+                                .first(where: { $0.id == taskID }),
+                                  case .downloading = task.state else { return }
+                            task.state = .downloading(progress: progress)
+                        }
+                    }
+                )
+                let recordingTitle = title
+                    ?? pendingYouTubeImports.first(where: { $0.id == taskID })?.title
+                    ?? videoID
+                let recording = try await importer.importDownloadedFile(
+                    at: tempURL, title: recordingTitle, context: context)
+                addToPlaybackPriority(reciter: recording.reciter, context: context, isPersonal: true)
+                downloadTasks[taskID] = nil
+                pendingYouTubeImports.removeAll { $0.id == taskID }
+            } catch is CancellationError {
+                // User stopped — removePendingYouTubeImport already cleaned up the row.
+                downloadTasks[taskID] = nil
+            } catch {
+                downloadTasks[taskID] = nil
+                pendingYouTubeImports
+                    .first(where: { $0.id == taskID })?
+                    .state = .failed(error.localizedDescription)
+            }
+        }
+        downloadTasks[taskID] = downloadTask
     }
 
     // MARK: - Priority list management
