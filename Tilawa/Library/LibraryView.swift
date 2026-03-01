@@ -31,6 +31,10 @@ struct LibraryView: View {
                     Task { await vm.importVideoFile(urls: urls, context: context) }
                 }
             }
+            // YouTube import
+            .sheet(isPresented: $vm.isShowingYouTubeImport) {
+                YouTubeImportView(vm: vm)
+            }
             // Inline annotation editor
             .sheet(item: $vm.pendingAnnotationRecording) { recording in
                 AnnotationEditorView(recording: recording)
@@ -64,31 +68,70 @@ struct LibraryView: View {
 
     // MARK: - Recordings section
 
+    private var hasActiveYouTubeDownload: Bool {
+        vm.pendingYouTubeImports.contains {
+            if case .downloading = $0.state { return true }
+            return false
+        }
+    }
+
     @ViewBuilder
     private var recordingSection: some View {
-        if recordings.isEmpty {
+        let hasContent = !recordings.isEmpty || !vm.pendingYouTubeImports.isEmpty
+
+        if !hasContent {
             Section {
                 emptyState
                     .listRowBackground(Color.clear)
                     .listRowInsets(.init())
             }
         } else {
-            Section("Recordings") {
-                ForEach(recordings, id: \.id) { recording in
-                    NavigationLink {
-                        RecordingDetailView(recording: recording)
-                    } label: {
-                        RecordingRowView(recording: recording) {
-                            vm.pendingAnnotationRecording = recording
+            // Pending / failed YouTube imports — shown in their own section so the
+            // footer note is scoped only to this block and only while downloading.
+            if !vm.pendingYouTubeImports.isEmpty {
+                Section {
+                    ForEach(vm.pendingYouTubeImports) { task in
+                        YouTubeImportRowView(
+                            task: task,
+                            onStop: { vm.removePendingYouTubeImport(task) }
+                        )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if case .failed = task.state {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    vm.removePendingYouTubeImport(task)
+                                }
+                            }
                         }
                     }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                        Button("Tag", systemImage: "tag") {
-                            vm.pendingAnnotationRecording = recording
+                } footer: {
+                    if hasActiveYouTubeDownload {
+                        Label(
+                            "Keep the app open while downloading from YouTube — the download will pause if you switch away. Audio and video file imports can finish briefly in the background.",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                    }
+                }
+            }
+
+            if !recordings.isEmpty {
+                Section("Recordings") {
+                    ForEach(recordings, id: \.id) { recording in
+                        NavigationLink {
+                            RecordingDetailView(recording: recording)
+                        } label: {
+                            RecordingRowView(recording: recording) {
+                                vm.pendingAnnotationRecording = recording
+                            }
                         }
-                        .tint(.accentColor)
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            deleteRecording(recording)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button("Tag", systemImage: "tag") {
+                                vm.pendingAnnotationRecording = recording
+                            }
+                            .tint(.accentColor)
+                            Button("Delete", systemImage: "trash", role: .destructive) {
+                                deleteRecording(recording)
+                            }
                         }
                     }
                 }
@@ -140,6 +183,12 @@ struct LibraryView: View {
             vm.isShowingVideoPicker = true
         } label: {
             Label("Import Video File", systemImage: "film")
+        }
+
+        Button {
+            vm.isShowingYouTubeImport = true
+        } label: {
+            Label("Import from YouTube", systemImage: "play.rectangle.fill")
         }
     }
 

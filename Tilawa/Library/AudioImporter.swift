@@ -109,6 +109,32 @@ final class AudioImporter {
         return recording
     }
 
+    // MARK: - Import already-downloaded file
+
+    /// Moves an already-downloaded file into the recordings directory and creates a Recording model.
+    /// Use this instead of `importAudioFile` when the source is not a security-scoped resource.
+    func importDownloadedFile(at url: URL, title: String, context: ModelContext) async throws -> Recording {
+        let fileExt = url.pathExtension.lowercased()
+        let recordingId = UUID()
+        let filename = "\(recordingId.uuidString).\(fileExt)"
+        let destURL = Self.recordingsDirectory.appendingPathComponent(filename)
+
+        try FileManager.default.moveItem(at: url, to: destURL)
+
+        let duration = await loadDuration(url: destURL)
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: destURL.path)[.size] as? Int) ?? 0
+
+        let recording = Recording(title: title, storagePath: filename)
+        recording.id = recordingId
+        recording.durationSeconds = duration
+        recording.fileFormat = fileExt
+        recording.fileSizeBytes = fileSize
+
+        context.insert(recording)
+        try context.save()
+        return recording
+    }
+
     // MARK: - Helpers
 
     private func loadDuration(url: URL) async -> Double? {
