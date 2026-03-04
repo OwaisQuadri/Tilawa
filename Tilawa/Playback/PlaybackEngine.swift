@@ -78,6 +78,7 @@ final class PlaybackEngine {
         // Re-activate audio session to ensure Now Playing eligibility
         try? AVAudioSession.sharedInstance().setActive(true)
         if !audioEngine.isRunning { try? audioEngine.start() }
+        remoteCommands.register(engine: self)
         // Apply speed from settings before scheduling audio
         currentSpeed = settings.speed
         timePitchUnit.rate = Float(settings.speed)
@@ -129,6 +130,8 @@ final class PlaybackEngine {
         unavailableAyah = nil
         nowPlaying.clear()
         if deactivateSession {
+            remoteCommands.unregister()
+            audioEngine.stop()
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
@@ -211,6 +214,7 @@ final class PlaybackEngine {
         do {
             try audioEngine.start()
         } catch {
+            nowPlaying.clear()
             state = .error(.engineStartFailed(error))
         }
     }
@@ -456,6 +460,8 @@ final class PlaybackEngine {
                 currentQueueIndex = 0
                 currentAyahRepetition = 1
                 currentRangeRepetition = 1
+                try? AVAudioSession.sharedInstance().setActive(true)
+                if !audioEngine.isRunning { try? audioEngine.start() }
                 await scheduleCurrentAyah()
 
             case .continuePages:
@@ -471,6 +477,8 @@ final class PlaybackEngine {
                 currentQueueIndex = 0
                 currentAyahRepetition = 1
                 currentRangeRepetition = 1
+                try? AVAudioSession.sharedInstance().setActive(true)
+                if !audioEngine.isRunning { try? audioEngine.start() }
                 await scheduleCurrentAyah()
             }
         }
