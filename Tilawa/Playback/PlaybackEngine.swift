@@ -582,8 +582,21 @@ final class PlaybackEngine {
             // Headphones unplugged — pause per Apple HIG
             pause()
         case .newDeviceAvailable:
-            // A new audio output (e.g. AirPods) connected — restart engine so it routes to it
+            // A new audio output (e.g. AirPods) connected — re-route and restore playback state
+            let wasPlaying = state == .playing
+            let wasPaused = state == .paused
             setupAudioEngine()
+            if wasPlaying || wasPaused {
+                Task {
+                    let ref = currentAyah ?? (ayahQueue.indices.contains(currentQueueIndex)
+                        ? ayahQueue[currentQueueIndex]
+                        : nil)
+                    if let ref {
+                        await seek(to: ref)
+                        if wasPaused { pause() }
+                    }
+                }
+            }
         default:
             break
         }
