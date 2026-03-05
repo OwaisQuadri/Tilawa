@@ -116,14 +116,14 @@ final class PlaybackViewModel {
 
     var ayahRepetitionLabel: String? {
         guard totalAyahRepetitions != 1 else { return nil }
-        if totalAyahRepetitions == -1 { return "Ayah ↺: ∞" }
-        return "Ayah ↺: \(currentAyahRepetition)/\(totalAyahRepetitions)"
+        if totalAyahRepetitions == -1 { return "Ayah ∞" }
+        return "Ayah \(currentAyahRepetition)/\(totalAyahRepetitions)"
     }
 
     var rangeRepetitionLabel: String? {
         guard totalRangeRepetitions != 1 else { return nil }
-        if totalRangeRepetitions == -1 { return "Range ↺: ∞" }
-        return "Range ↺: \(currentRangeRepetition)/\(totalRangeRepetitions)"
+        if totalRangeRepetitions == -1 { return "Range ∞" }
+        return "Range \(currentRangeRepetition)/\(totalRangeRepetitions)"
     }
 
     var repetitionLabel: String? {

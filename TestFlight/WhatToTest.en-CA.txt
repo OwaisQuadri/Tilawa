@@ -1,7 +1,2 @@
-- Browse and play Quran recitations from a selection of reciters.
-- Download reciter audio for a surah to listen offline.
-- Import personal recordings from audio or video files via the Library tab.
-- Import audio from YouTube by pasting a video link — download progress is shown inline with a stop button to cancel.
-- Annotate a recording with ayah markers to navigate by verse during playback.
-- Manage which reciters appear in playback using the priority list in the Library tab.
-- Switch reciters and surahs from the playback screen without leaving the player.
+- Repeat progress is now shown in the mini player bar — set verse or range repeat in playback settings and the current repeat count (e.g. "Ayah 2/5" or "Range 1/3") appears below the reciter name during playback.
+- New "Verse repeats" setting in the Repeat section (visible when both verse repeat and range repeat are greater than 1): "Every range pass" repeats each verse on every pass through the range; "First pass only" repeats verses on the first pass and plays each verse once on subsequent passes.
