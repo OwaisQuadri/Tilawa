@@ -14,6 +14,12 @@ enum AnnotationStatus: String, Codable {
     case complete    = "complete"
 }
 
+/// Whether ayah repeats apply to every range pass or only the first.
+enum RangeRepeatBehavior: String, CaseIterable, Codable {
+    case whileRepeatingAyahs = "whileRepeatingAyahs"   // default: every pass includes ayah repeats
+    case afterRepeatingAyahs = "afterRepeatingAyahs"   // only first pass includes ayah repeats
+}
+
 /// How a CDN reciter's audio files are named.
 enum ReciterNamingPattern: String, Codable {
     /// Files named {surah3}{ayah3}.{format} — e.g. 001001.mp3 (EveryAyah format)
