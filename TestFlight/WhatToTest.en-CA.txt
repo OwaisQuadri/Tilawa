@@ -1,3 +1,8 @@
 - Start audio playback in the app. Trigger an incoming phone call (or use the simulator with xcrun simctl to simulate a call). Verify audio pauses immediately when the call begins.
 - After the call ends, verify audio remains paused and does NOT auto-resume. Manually tap play to resume — audio should continue from where it was paused.
 - Verify normal pause/resume functionality (without a phone call interruption) still works correctly.
+- Play a multi-ayah range with ayah repetition > 1 and a gap between repetitions. While audio is in the gap (silence), press the headphone button once — playback should pause.
+- Press the headphone button again — playback should resume and continue with the next repetition (not replay the gap).
+- Play a multi-ayah range. Press the headphone button during the silence between two different ayahs — playback should pause cleanly without advancing to the next ayah.
+- Resume from that paused state — the next ayah should begin playing.
+- Verify the lock screen and Control Center play/pause button behaves the same in all of the above scenarios.
