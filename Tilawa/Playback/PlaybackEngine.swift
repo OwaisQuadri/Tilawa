@@ -134,7 +134,7 @@ final class PlaybackEngine {
         currentRangeRepetition = 0
         isInPlainRangePass = false
         unavailableAyah = nil
-        nowPlaying.clear()
+        nowPlaying.clear(deactivateSession: deactivateSession)
         if deactivateSession {
             remoteCommands.unregister()
             audioEngine.stop()

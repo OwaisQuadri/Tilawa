@@ -16,6 +16,8 @@ final class AyahMarker {
     var assignedEndSurah: Int?   // optional end of ayah range (for multi-ayah segments)
     var assignedEndAyah: Int?
     var endPositionSeconds: Double?  // explicit end time; if nil, next marker's start is used
+    var reciterID: UUID?             // reciter to assign to the segment opening at this marker
+    var riwayah: String?             // Riwayah.rawValue — riwayah for the segment opening at this marker
 
     // MARK: - Nil initializer (required for CloudKit)
     init() {
@@ -26,6 +28,8 @@ final class AyahMarker {
         self.assignedSurah = nil; self.assignedAyah = nil
         self.assignedEndSurah = nil; self.assignedEndAyah = nil
         self.endPositionSeconds = nil
+        self.reciterID = nil
+        self.riwayah = nil
     }
 
     // MARK: - Convenience initializer

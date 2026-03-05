@@ -63,7 +63,8 @@ final class PlaybackViewModel {
     /// Plays a recording's ayah range with no repeats and stop-after behavior.
     /// Does NOT modify the user's persisted PlaybackSettings.
     func playRecording(range: AyahRange, recording: Recording) async {
-        guard let reciter = recording.reciter else { return }
+        let reciters = recording.reciters
+        guard !reciters.isEmpty else { return }
         let snapshot = PlaybackSettingsSnapshot(
             range: range,
             connectionAyahBefore: 0,
@@ -77,9 +78,9 @@ final class PlaybackViewModel {
             afterRepeatContinuePagesCount: 0,
             afterRepeatContinuePagesExtraAyah: false,
             gapBetweenAyaatMs: 0,
-            reciterPriority: [ReciterSnapshot(reciterId: reciter.id ?? UUID(), reciter: reciter)],
+            reciterPriority: reciters.map { ReciterSnapshot(reciterId: $0.id ?? UUID(), reciter: $0) },
             segmentOverrides: [],
-            riwayah: recording.safeRiwayah,
+            riwayah: recording.riwayahs.first ?? .hafs,
             coveredAyahs: coveredAyahsForRecording(recording)
         )
         await engine.play(range: range, settings: snapshot)
@@ -146,19 +147,20 @@ final class PlaybackViewModel {
             // Specific reciter selected — use only that one
             reciterSnapshots = [ReciterSnapshot(reciterId: pinnedId, reciter: reciter)]
         } else {
-            // Auto — filter to reciters that have at least one source for the selected riwayah,
-            // matching the view's matchingReciters(riwayah:) logic.
+            // Auto — filter to reciters that have at least one source for the selected riwayah
+            // (exact or compatible), matching the view's matchingReciters(riwayah:) logic.
             let targetRiwayah = settings.safeRiwayah
+            let everCompat = RiwayahCompatibilityService.shared.everCompatible(with: targetRiwayah)
             for entry in priorityEntries {
                 guard let reciterId = entry.reciterId else { continue }
                 guard let reciter = allReciters.first(where: { $0.id == reciterId }) else { continue }
-                let hasCDNSource = (reciter.cdnSources ?? []).contains {
-                    Riwayah(rawValue: $0.riwayah ?? "") == targetRiwayah
+                let hasCompatibleCDN = (reciter.cdnSources ?? []).contains {
+                    guard let raw = $0.riwayah, let r = Riwayah(rawValue: raw) else { return false }
+                    return everCompat.contains(r)
                 }
-                let hasSegment = (reciter.recordings ?? [])
-                    .flatMap { $0.segments ?? [] }
-                    .contains { $0.safeRiwayah == targetRiwayah }
-                guard hasCDNSource || hasSegment else { continue }
+                let hasCompatibleSegment = (reciter.segments ?? [])
+                    .contains { everCompat.contains($0.safeRiwayah) }
+                guard hasCompatibleCDN || hasCompatibleSegment else { continue }
                 reciterSnapshots.append(ReciterSnapshot(reciterId: reciterId, reciter: reciter))
             }
         }

@@ -289,7 +289,7 @@ final class ManifestImportViewModel {
         source.reciter = target
         target.cdnSources = (target.cdnSources ?? []) + [source]
         created.cdnSources = (created.cdnSources ?? []).filter { $0.id != source.id }
-        if (created.cdnSources ?? []).isEmpty && (created.recordings ?? []).isEmpty {
+        if (created.cdnSources ?? []).isEmpty && (created.segments ?? []).isEmpty {
             if let id = created.id {
                 PlaybackSettings.cleanupPriorityEntries(for: id, in: context)
             }

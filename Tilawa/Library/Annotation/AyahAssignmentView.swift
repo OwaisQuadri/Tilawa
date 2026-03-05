@@ -12,11 +12,14 @@ struct AyahAssignmentView: View {
     let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Reciter.name) private var allReciters: [Reciter]
 
     @State private var selectedSurah: Int?
     @State private var selectedAyah: Int?
     @State private var selectedEndSurah: Int?
     @State private var selectedEndAyah: Int?
+    @State private var selectedReciterID: UUID?
+    @State private var selectedRiwayah: Riwayah?
     @State private var showDeleteConfirm = false
 
     init(marker: AyahMarker,
@@ -27,10 +30,17 @@ struct AyahAssignmentView: View {
         self.suggestedRef = suggestedRef
         self.onAssign = onAssign
         self.onDelete = onDelete
-        _selectedSurah    = State(initialValue: marker.assignedSurah)
-        _selectedAyah     = State(initialValue: marker.assignedAyah)
-        _selectedEndSurah = State(initialValue: marker.assignedEndSurah)
-        _selectedEndAyah  = State(initialValue: marker.assignedEndAyah)
+        _selectedSurah      = State(initialValue: marker.assignedSurah)
+        _selectedAyah       = State(initialValue: marker.assignedAyah)
+        _selectedEndSurah   = State(initialValue: marker.assignedEndSurah)
+        _selectedEndAyah    = State(initialValue: marker.assignedEndAyah)
+        _selectedReciterID  = State(initialValue: marker.reciterID)
+        _selectedRiwayah    = State(initialValue: Riwayah(rawValue: marker.riwayah ?? ""))
+    }
+
+    private var startAyahSelected: Bool { selectedSurah != nil && selectedAyah != nil }
+    private var confirmDisabled: Bool {
+        startAyahSelected && (selectedReciterID == nil || selectedRiwayah == nil)
     }
 
     // Default for "ending at marker" picker:
@@ -77,12 +87,14 @@ struct AyahAssignmentView: View {
                             defaultAyah: d.ayah
                         )
                     } label: {
-                        LabeledContent("Ayah ending at marker") {
+                        LabeledContent("Ayah Ending at Marker") {
                             Text(ayahLabel(surah: selectedEndSurah, ayah: selectedEndAyah))
                                 .foregroundStyle(selectedEndSurah == nil ? .tertiary : .secondary)
                         }
                     }
+                }
 
+                Section {
                     NavigationLink {
                         let d = startPickerDefault()
                         AyahPickerDetailView(
@@ -93,14 +105,36 @@ struct AyahAssignmentView: View {
                             defaultAyah: d.ayah
                         )
                     } label: {
-                        LabeledContent("Ayah starting at marker") {
+                        LabeledContent("Ayah Starting at Marker") {
                             Text(ayahLabel(surah: selectedSurah, ayah: selectedAyah))
                                 .foregroundStyle(selectedSurah == nil ? .tertiary : .secondary)
                         }
                     }
-                } footer: {
-                    Text("Set the ending ayah to close the previous segment here, and the starting ayah to open a new segment. Both are optional.")
-                        .font(.caption)
+
+                    if startAyahSelected {
+                        let reciterName = allReciters.first(where: { $0.id == selectedReciterID })?.safeName
+                        NavigationLink {
+                            ReciterPickerView(selectedID: selectedReciterID) { id in
+                                selectedReciterID = id
+                            }
+                        } label: {
+                            LabeledContent("Reciter") {
+                                Text(reciterName ?? "")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        NavigationLink {
+                            RiwayahPickerView(selectedRiwayah: selectedRiwayah) { riwayah in
+                                selectedRiwayah = riwayah
+                            }
+                        } label: {
+                            LabeledContent("Riwayah") {
+                                Text(selectedRiwayah?.displayName ?? "")
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
 
                 Section {
@@ -134,10 +168,13 @@ struct AyahAssignmentView: View {
                         let endRef = selectedEndSurah.flatMap { s in
                             selectedEndAyah.map { a in AyahRef(surah: s, ayah: a) }
                         }
+                        marker.reciterID = selectedReciterID
+                        marker.riwayah   = selectedRiwayah?.rawValue
                         onAssign(startRef, endRef)
                         dismiss()
                     }
                     .fontWeight(.semibold)
+                    .disabled(confirmDisabled)
                 }
             }
         }
@@ -157,6 +194,111 @@ struct AyahAssignmentView: View {
         let s  = Int(secs) % 60
         let ms = Int((secs - Double(Int(secs))) * 10)
         return String(format: "Marker at %d:%02d.%d", m, s, ms)
+    }
+}
+
+// MARK: - ReciterPickerView
+
+/// Navigation-pushed reciter selection list with inline "New Reciter" creation.
+struct ReciterPickerView: View {
+
+    let selectedID: UUID?
+    let onSelect: (UUID?) -> Void
+
+    @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
+    @Query(sort: \Reciter.name) private var reciters: [Reciter]
+
+    @State private var showNewReciterAlert = false
+    @State private var newReciterName = ""
+
+    var body: some View {
+        List {
+            Button("None") {
+                onSelect(nil)
+                dismiss()
+            }
+            .foregroundStyle(.red)
+
+            ForEach(reciters) { reciter in
+                Button {
+                    onSelect(reciter.id)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(reciter.safeName)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        if reciter.id == selectedID {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Reciter")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button("New Reciter", systemImage: "plus") {
+                    newReciterName = ""
+                    showNewReciterAlert = true
+                }
+            }
+        }
+        .alert("New Reciter", isPresented: $showNewReciterAlert) {
+            TextField("Name", text: $newReciterName)
+            Button("Add") {
+                let trimmed = newReciterName.trimmingCharacters(in: .whitespaces)
+                guard !trimmed.isEmpty else { return }
+                let reciter = Reciter()
+                reciter.id = UUID()
+                reciter.name = trimmed
+                reciter.localCacheDirectory = reciter.id!.uuidString
+                context.insert(reciter)
+                try? context.save()
+                onSelect(reciter.id)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Enter a name for the new reciter.")
+        }
+    }
+}
+
+// MARK: - RiwayahPickerView
+
+/// Navigation-pushed riwayah selection list.
+struct RiwayahPickerView: View {
+
+    let selectedRiwayah: Riwayah?
+    let onSelect: (Riwayah?) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            ForEach(Riwayah.allCases, id: \.self) { riwayah in
+                Button {
+                    onSelect(riwayah)
+                    dismiss()
+                } label: {
+                    HStack {
+                        Text(riwayah.displayName)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        if riwayah == selectedRiwayah {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Riwayah")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -20,8 +20,8 @@ final class Reciter {
     @Relationship(deleteRule: .cascade)
     var cdnSources: [ReciterCDNSource]?
 
-    @Relationship(deleteRule: .cascade)
-    var recordings: [Recording]?
+    @Relationship(deleteRule: .nullify)
+    var segments: [RecordingSegment]?
 
     // MARK: - Nil initializer (required for CloudKit)
     init() {
@@ -32,23 +32,21 @@ final class Reciter {
         self.coverImageURL = nil; self.sortOrder = nil; self.style = nil
         self.missingAyahsJSON = nil
         self.cdnSources = nil
-        self.recordings = nil
+        self.segments = nil
     }
 
     // MARK: - Safe computed properties
     var safeName: String { name ?? "Unknown Reciter" }
     var hasCDN: Bool { !(cdnSources ?? []).isEmpty }
-    var hasPersonalRecordings: Bool { !(recordings ?? []).isEmpty }
+    var hasPersonalRecordings: Bool { !(segments ?? []).isEmpty }
 
     /// All riwayaat this reciter covers, sorted by segment count descending.
     /// CDN source riwayaat are included (with segmentCount = 0 if no personal segments match).
     /// Personal-recording riwayaat derive from segments.
     var riwayahSummary: [(riwayah: Riwayah, segmentCount: Int)] {
         var counts: [Riwayah: Int] = [:]
-        for recording in recordings ?? [] {
-            for segment in recording.segments ?? [] {
-                counts[segment.safeRiwayah, default: 0] += 1
-            }
+        for segment in segments ?? [] {
+            counts[segment.safeRiwayah, default: 0] += 1
         }
         for source in cdnSources ?? [] {
             if let raw = source.riwayah, let r = Riwayah(rawValue: raw) {

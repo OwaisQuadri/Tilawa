@@ -40,7 +40,9 @@ final class LibraryViewModel {
             updateImportActivity(completed: index, total: urls.count, currentFileName: name)
             do {
                 let recording = try await importer.importAudioFile(at: url, context: context)
-                addToPlaybackPriority(reciter: recording.reciter, context: context, isPersonal: true)
+                for reciter in recording.reciters {
+                    addToPlaybackPriority(reciter: reciter, context: context, isPersonal: true)
+                }
             } catch {
                 errors.append("\"\(name)\": \(error.localizedDescription)")
             }
@@ -69,7 +71,9 @@ final class LibraryViewModel {
             updateImportActivity(completed: index, total: urls.count, currentFileName: name)
             do {
                 let recording = try await importer.importVideoFile(at: url, context: context)
-                addToPlaybackPriority(reciter: recording.reciter, context: context, isPersonal: true)
+                for reciter in recording.reciters {
+                    addToPlaybackPriority(reciter: reciter, context: context, isPersonal: true)
+                }
             } catch {
                 errors.append("\"\(name)\": \(error.localizedDescription)")
             }
@@ -125,7 +129,9 @@ final class LibraryViewModel {
                     ?? videoID
                 let recording = try await importer.importDownloadedFile(
                     at: tempURL, title: recordingTitle, context: context)
-                addToPlaybackPriority(reciter: recording.reciter, context: context, isPersonal: true)
+                for reciter in recording.reciters {
+                    addToPlaybackPriority(reciter: reciter, context: context, isPersonal: true)
+                }
                 downloadTasks[taskID] = nil
                 pendingYouTubeImports.removeAll { $0.id == taskID }
             } catch is CancellationError {

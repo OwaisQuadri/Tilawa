@@ -30,7 +30,7 @@ struct SegmentPriorityView: View {
     }
 
     private var relevantSegments: [RecordingSegment] {
-        allSegments.filter { $0.recording?.reciter?.id == reciterId }
+        allSegments.filter { $0.reciter?.id == reciterId }
     }
 
     private let metadata = QuranMetadataService.shared

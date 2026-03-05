@@ -1,3 +1,5 @@
-- Delete a CDN reciter's last source via swipe-delete — the reciter should disappear from Reciters tab, Priority list, and all segment overrides immediately.
-- Reassign a recording to a different reciter — the previous reciter should disappear from Priority list and segment overrides if it now has no sources.
-- Add a personal recording (file, video, or YouTube) — the reciter should appear in Priority list AND any existing segment overrides automatically.
+- Annotate a recording with ayah markers. Assign a start ayah to a marker, then tap "Riwayah" to set a per-marker riwayah (e.g., Warsh). Confirm — the segment should save with that riwayah.
+- Add a second marker after the first — verify the riwayah carries forward automatically from the previous marker.
+- Open the Play modal with a CDN reciter that has limited coverage (e.g., Minshawi). Verify a "Checking available ayaat…" progress indicator appears, FROM/TO pickers are disabled while it runs, then restrict to available ayahs once done.
+- Open the Play modal, select a riwayah, and verify the FROM/TO range only shows ayahs compatible with that riwayah and the selected reciter.
+- Play a recording annotated with mixed riwayaat — verify only segments compatible with the selected riwayah are played.

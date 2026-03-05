@@ -26,6 +26,7 @@ struct PlaybackSetupSheet: View {
     @State private var startAyah:  Int = 1
     @State private var endSurah:   Int = 1
     @State private var endAyah:    Int = 7
+    @State private var isCheckingAvailability = false
 
     // MARK: - Body
 
@@ -54,7 +55,7 @@ struct PlaybackSetupSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
-        .onAppear { initializeRange(); snapReciterSelectionIfNeeded(); snapRangeToAvailableIfNeeded() }
+        .onAppear { initializeRange(); snapReciterSelectionIfNeeded(); snapRangeToAvailableIfNeeded(); triggerAvailabilityChecksIfNeeded() }
     }
 
     // MARK: - Recitation section
@@ -143,6 +144,7 @@ struct PlaybackSetupSheet: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .disabled(isCheckingAvailability)
 
             // To row — restricted to valid end ayahs
             NavigationLink {
@@ -155,14 +157,31 @@ struct PlaybackSetupSheet: View {
                         .foregroundStyle(.secondary)
                 }
             }
+            .disabled(isCheckingAvailability)
+
+            if rangeHasSkips {
+                Text("Warning: this range covers ayaat that will be skipped due to missing audio.")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+            }
+            if isCheckingAvailability {
+                HStack(spacing: 6) {
+                    ProgressView().controlSize(.mini)
+                    Text("Checking available ayaat…")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
         } header: {
             Text("Range")
         }
         .onChange(of: settings?.selectedReciterId) { _, _ in
             snapRangeToAvailableIfNeeded()
+            triggerAvailabilityChecksIfNeeded()
         }
         .onChange(of: settings?.selectedRiwayah) { _, _ in
             snapRangeToAvailableIfNeeded()
+            triggerAvailabilityChecksIfNeeded()
         }
     }
 
@@ -357,12 +376,17 @@ struct PlaybackSetupSheet: View {
         return enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s).isEmpty
     }
 
-    /// Reciters that have at least one audio source for the given riwayah:
-    /// CDN reciters matched by their CDN riwayah, or personal-recording reciters with at least one matching segment.
+    /// Reciters that have at least one audio source for the given riwayah (exact or compatible).
+    /// CDN sources are matched by exact or ever-compatible riwayah;
+    /// personal-recording reciters are matched by segment riwayah.
     private func matchingReciters(riwayah: Riwayah) -> [Reciter] {
-        allReciters.filter { r in
-            (r.hasCDN && (r.cdnSources ?? []).contains { Riwayah(rawValue: $0.riwayah ?? "") == riwayah }) ||
-            (r.recordings ?? []).flatMap { $0.segments ?? [] }.contains { $0.safeRiwayah == riwayah }
+        let everCompat = RiwayahCompatibilityService.shared.everCompatible(with: riwayah)
+        return allReciters.filter { r in
+            if (r.cdnSources ?? []).contains(where: {
+                guard let raw = $0.riwayah, let cdnR = Riwayah(rawValue: raw) else { return false }
+                return everCompat.contains(cdnR)
+            }) { return true }
+            return (r.segments ?? []).contains { everCompat.contains($0.safeRiwayah) }
         }
     }
 
@@ -401,15 +425,16 @@ struct PlaybackSetupSheet: View {
     /// nil = no filtering (all available or availability unknown).
     private var availableAyahsForSelection: Set<AyahRef>? {
         guard let s = settings else { return nil }
+        let targetRiwayah = s.safeRiwayah
         if let reciterId = s.selectedReciterId,
            let reciter = allReciters.first(where: { $0.id == reciterId }) {
-            return availableAyahs(for: reciter)
+            return availableAyahs(for: reciter, targetRiwayah: targetRiwayah)
         }
         // Auto mode: union of per-reciter available sets.
         // An ayah is available if at least ONE enabled reciter has it.
-        let enabled = enabledMatchingReciters(riwayah: s.safeRiwayah, settings: s)
+        let enabled = enabledMatchingReciters(riwayah: targetRiwayah, settings: s)
         guard !enabled.isEmpty else { return nil }
-        let perReciterAvail = enabled.map { availableAyahs(for: $0) }
+        let perReciterAvail = enabled.map { availableAyahs(for: $0, targetRiwayah: targetRiwayah) }
         // Any unknown (nil) reciter means we can't restrict.
         if perReciterAvail.contains(where: { $0 == nil }) { return nil }
         var union = Set<AyahRef>()
@@ -459,8 +484,16 @@ struct PlaybackSetupSheet: View {
         _ reciter: Reciter,
         riwayah: Riwayah
     ) -> (starts: Set<AyahRef>, ends: Set<AyahRef>)? {
-        let segments = (reciter.recordings ?? []).flatMap { $0.segments ?? [] }
-            .filter { $0.safeRiwayah == riwayah }
+        let segments = (reciter.segments ?? []).filter { seg in
+            let segRiwayah = seg.safeRiwayah
+            if segRiwayah == riwayah { return true }
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { return false }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber ?? sa
+            return isCompatibleAcrossRange(segRiwayah: segRiwayah, targetRiwayah: riwayah,
+                                           from: AyahRef(surah: ss, ayah: sa),
+                                           to: AyahRef(surah: es, ayah: ea))
+        }
         guard !segments.isEmpty else { return nil }
         var starts = Set<AyahRef>()
         var ends   = Set<AyahRef>()
@@ -473,22 +506,59 @@ struct PlaybackSetupSheet: View {
         return starts.isEmpty ? nil : (starts, ends)
     }
 
-    private func availableAyahs(for reciter: Reciter) -> Set<AyahRef>? {
+    private func availableAyahs(for reciter: Reciter, targetRiwayah: Riwayah) -> Set<AyahRef>? {
         // Local-only reciter: derive from annotated RecordingSegments
         if !reciter.hasCDN {
-            return reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter) : nil
+            return reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter, targetRiwayah: targetRiwayah) : nil
         }
         // CDN reciter: use pre-computed availability check
         guard reciter.availabilityChecked else { return nil }
         let missing = Set(reciter.missingAyahs)
-        guard !missing.isEmpty else { return nil }
-        return buildAvailableSet(excluding: missing)
+
+        let cdnRiwayaat = (reciter.cdnSources ?? []).compactMap { src -> Riwayah? in
+            guard let raw = src.riwayah else { return nil }
+            return Riwayah(rawValue: raw)
+        }
+
+        // Exact CDN source for targetRiwayah: standard behavior (nil = full coverage).
+        if cdnRiwayaat.contains(targetRiwayah) {
+            guard !missing.isEmpty else { return nil }
+            return buildAvailableSet(excluding: missing)
+        }
+
+        // No exact CDN source: build compatibility-filtered set.
+        guard !cdnRiwayaat.isEmpty else { return nil }
+        let compat = RiwayahCompatibilityService.shared
+        var filtered = Set<AyahRef>()
+        filtered.reserveCapacity(6236)
+        for surah in 1...114 {
+            let count = metadata.ayahCount(surah: surah)
+            for ayah in 1...max(1, count) {
+                let ref = AyahRef(surah: surah, ayah: ayah)
+                if missing.contains(ref) { continue }
+                let compatibles = compat.compatibleRiwayaat(surah: surah, ayah: ayah, targetRiwayah: targetRiwayah)
+                if cdnRiwayaat.contains(where: { compatibles.contains($0) }) {
+                    filtered.insert(ref)
+                }
+            }
+        }
+        return filtered.isEmpty ? nil : filtered
     }
 
-    /// Expands all RecordingSegments for a local reciter into individual AyahRefs.
-    /// Returns nil if the reciter has no segments or covers all 6236 ayahs.
-    private func availableAyahsForLocalReciter(_ reciter: Reciter) -> Set<AyahRef>? {
-        let segments = reciter.recordings?.flatMap { $0.segments ?? [] } ?? []
+    /// Expands RecordingSegments for a local reciter into individual AyahRefs,
+    /// restricted to segments whose riwayah is compatible with `targetRiwayah` across the full range.
+    /// Returns nil if the reciter has no matching segments or covers all 6236 ayahs.
+    private func availableAyahsForLocalReciter(_ reciter: Reciter, targetRiwayah: Riwayah) -> Set<AyahRef>? {
+        let segments = (reciter.segments ?? []).filter { seg in
+            let segRiwayah = seg.safeRiwayah
+            if segRiwayah == targetRiwayah { return true }
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { return false }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber ?? sa
+            return isCompatibleAcrossRange(segRiwayah: segRiwayah, targetRiwayah: targetRiwayah,
+                                           from: AyahRef(surah: ss, ayah: sa),
+                                           to: AyahRef(surah: es, ayah: ea))
+        }
         guard !segments.isEmpty else { return nil }
         var available = Set<AyahRef>()
         available.reserveCapacity(6236)
@@ -505,6 +575,64 @@ struct PlaybackSetupSheet: View {
             }
         }
         return available.count >= 6236 ? nil : available
+    }
+
+    /// True if the current From–To range contains at least one ayah that would be skipped
+    /// (not covered by any available source for the selected riwayah).
+    ///
+    /// In Auto mode, computes the union of KNOWN per-reciter coverages. A CDN reciter with
+    /// confirmed full coverage (availabilityChecked + no missing ayahs) suppresses the warning
+    /// entirely. Unchecked CDN reciters contribute no known coverage — the warning may fire
+    /// conservatively, but will not produce false negatives.
+    private var rangeHasSkips: Bool {
+        guard let s = settings else { return false }
+        let targetRiwayah = s.safeRiwayah
+        let rangeStart = AyahRef(surah: startSurah, ayah: startAyah)
+        let rangeEnd   = AyahRef(surah: endSurah,   ayah: endAyah)
+
+        // Specific reciter: straightforward.
+        if let reciterId = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == reciterId }) {
+            guard let coverage = availableAyahs(for: reciter, targetRiwayah: targetRiwayah)
+            else { return false }
+            return rangeContainsGap(coverage, from: rangeStart, to: rangeEnd)
+        }
+
+        // Auto mode: build union of KNOWN (non-nil) per-reciter coverages.
+        // If any reciter has confirmed full coverage, no skip is possible — suppress.
+        // Unchecked CDN reciters are unknown — don't count as coverage.
+        let enabled = enabledMatchingReciters(riwayah: targetRiwayah, settings: s)
+        guard !enabled.isEmpty else { return false }
+
+        var known = Set<AyahRef>()
+        known.reserveCapacity(6236)
+        for reciter in enabled {
+            if let avail = availableAyahs(for: reciter, targetRiwayah: targetRiwayah) {
+                known.formUnion(avail)
+            } else if isConfirmedFullCoverage(reciter, targetRiwayah: targetRiwayah) {
+                return false   // guaranteed coverage → no skips possible
+            }
+            // nil from unchecked/incompatible CDN: unknown — omit from union
+        }
+        guard !known.isEmpty else { return false }   // all unknowns → can't determine
+        return rangeContainsGap(known, from: rangeStart, to: rangeEnd)
+    }
+
+    private func rangeContainsGap(_ coverage: Set<AyahRef>, from start: AyahRef, to end: AyahRef) -> Bool {
+        var cur = start
+        while cur <= end {
+            if !coverage.contains(cur) { return true }
+            guard let next = nextAyah(after: cur) else { break }
+            cur = next
+        }
+        return false
+    }
+
+    /// Returns true when a CDN reciter is known to provide gapless coverage for targetRiwayah.
+    private func isConfirmedFullCoverage(_ reciter: Reciter, targetRiwayah: Riwayah) -> Bool {
+        guard reciter.hasCDN && reciter.availabilityChecked else { return false }
+        let cdnRiwayaat = (reciter.cdnSources ?? []).compactMap { Riwayah(rawValue: $0.riwayah ?? "") }
+        return cdnRiwayaat.contains(targetRiwayah) && Set(reciter.missingAyahs).isEmpty
     }
 
     /// True if all ayahs in the preset's range are in the available set.
@@ -530,6 +658,23 @@ struct PlaybackSetupSheet: View {
             }
         }
         return available
+    }
+
+    // MARK: - Range compatibility helper
+
+    private func isCompatibleAcrossRange(segRiwayah: Riwayah,
+                                          targetRiwayah: Riwayah,
+                                          from start: AyahRef,
+                                          to end: AyahRef) -> Bool {
+        let compat = RiwayahCompatibilityService.shared
+        var current = start
+        while current <= end {
+            let compatibles = compat.compatibleRiwayaat(surah: current.surah, ayah: current.ayah, targetRiwayah: targetRiwayah)
+            if !compatibles.contains(segRiwayah) { return false }
+            guard let next = nextAyah(after: current) else { break }
+            current = next
+        }
+        return true
     }
 
     // MARK: - Sequential ayah navigation
@@ -571,6 +716,40 @@ struct PlaybackSetupSheet: View {
         }
     }
 
+    /// Triggers CDN availability checks for any unchecked CDN reciters in the current selection.
+    /// Runs in the background; updates FROM/TO pickers via @Query refresh when complete.
+    private func triggerAvailabilityChecksIfNeeded() {
+        guard !isCheckingAvailability, let s = settings else { return }
+        let targetRiwayah = s.safeRiwayah
+
+        var toCheck: [Reciter]
+        if let reciterId = s.selectedReciterId,
+           let reciter = allReciters.first(where: { $0.id == reciterId }),
+           reciter.hasCDN && !reciter.availabilityChecked {
+            toCheck = [reciter]
+        } else if s.selectedReciterId == nil {
+            toCheck = enabledMatchingReciters(riwayah: targetRiwayah, settings: s)
+                .filter { $0.hasCDN && !$0.availabilityChecked }
+        } else {
+            return
+        }
+        guard !toCheck.isEmpty else { return }
+
+        isCheckingAvailability = true
+        Task {
+            defer { isCheckingAvailability = false }
+            for reciter in toCheck {
+                let missing = await CDNAvailabilityChecker.shared.findMissingAyahs(
+                    reciter: reciter, source: nil, progress: { _ in })
+                guard let data = try? JSONEncoder().encode(missing),
+                      let json = String(data: data, encoding: .utf8) else { continue }
+                reciter.missingAyahsJSON = json
+                try? context.save()
+            }
+            snapRangeToAvailableIfNeeded()
+        }
+    }
+
     /// Snaps start/end to valid allowed ayahs when reciter changes.
     private func snapRangeToAvailableIfNeeded() {
         let (allowedStart, allowedEnd) = allowedAyahRanges
@@ -592,7 +771,7 @@ struct PlaybackSetupSheet: View {
         if let id = s.selectedReciterId, let reciter = allReciters.first(where: { $0.id == id }) {
             // Local-only reciter: enable continuation only if fully annotated (all 6236 ayahs)
             if !reciter.hasCDN {
-                return reciter.hasPersonalRecordings && availableAyahsForLocalReciter(reciter) == nil
+                return reciter.hasPersonalRecordings && availableAyahsForLocalReciter(reciter, targetRiwayah: s.safeRiwayah) == nil
             }
             return reciter.hasCDN
         }
@@ -658,10 +837,18 @@ struct PlaybackSetupSheet: View {
         return union.isEmpty ? nil : union
     }
 
-    /// Expands segments of a reciter matching `riwayah` into a flat AyahRef set.
+    /// Expands segments of a reciter compatible with `riwayah` into a flat AyahRef set.
     private func expandSegments(of reciter: Reciter, riwayah: Riwayah) -> Set<AyahRef>? {
-        let segments = (reciter.recordings ?? []).flatMap { $0.segments ?? [] }
-            .filter { $0.safeRiwayah == riwayah }
+        let segments = (reciter.segments ?? []).filter { seg in
+            let segRiwayah = seg.safeRiwayah
+            if segRiwayah == riwayah { return true }
+            guard let ss = seg.surahNumber, let sa = seg.ayahNumber else { return false }
+            let es = seg.endSurahNumber ?? ss
+            let ea = seg.endAyahNumber ?? sa
+            return isCompatibleAcrossRange(segRiwayah: segRiwayah, targetRiwayah: riwayah,
+                                           from: AyahRef(surah: ss, ayah: sa),
+                                           to: AyahRef(surah: es, ayah: ea))
+        }
         guard !segments.isEmpty else { return nil }
         var covered = Set<AyahRef>()
         for seg in segments {

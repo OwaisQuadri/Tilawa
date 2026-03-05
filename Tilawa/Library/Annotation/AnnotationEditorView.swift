@@ -226,6 +226,11 @@ struct AnnotationEditorView: View {
         let pos = vm.previewPosition
         let newMarker = vm.addMarker(at: pos, context: context)
 
+        // Carry-forward reciterID and riwayah from the last marker before this position
+        let prevMarker = recordingMarkers.filter { ($0.positionSeconds ?? 0) < pos }.last
+        newMarker.reciterID = prevMarker?.reciterID
+        newMarker.riwayah   = prevMarker?.riwayah ?? Riwayah.hafs.rawValue
+
         guard autoAssignEnabled else { return }
 
         // Find the last confirmed marker with an ayah that sits before this position

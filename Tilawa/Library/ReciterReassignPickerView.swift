@@ -37,7 +37,7 @@ struct ReciterReassignPickerView: View {
         source.reciter = newReciter
         newReciter.cdnSources = (newReciter.cdnSources ?? []) + [source]
         excludedReciter.cdnSources = (excludedReciter.cdnSources ?? []).filter { $0.id != source.id }
-        if (excludedReciter.cdnSources ?? []).isEmpty && (excludedReciter.recordings ?? []).isEmpty {
+        if (excludedReciter.cdnSources ?? []).isEmpty && (excludedReciter.segments ?? []).isEmpty {
             if let id = excludedReciter.id {
                 PlaybackSettings.cleanupPriorityEntries(for: id, in: context)
             }
