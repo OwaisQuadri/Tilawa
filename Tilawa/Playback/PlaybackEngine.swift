@@ -44,6 +44,7 @@ final class PlaybackEngine {
     private var ayahStartDate: Date?       // Wall-clock time when current ayah began playing
     private var pausedElapsedTime: TimeInterval = 0  // Elapsed when last paused
     private var isInPlainRangePass: Bool = false
+    private var pausedByInterruption: Bool = false
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
     private var engineConfigObserver: NSObjectProtocol?
@@ -58,8 +59,8 @@ final class PlaybackEngine {
         self.nowPlaying = nowPlaying
         self.remoteCommands = remoteCommands
         self.metadata = metadata
-        setupAudioEngine()
         registerInterruptionHandlers()
+        setupAudioEngine()
         remoteCommands.register(engine: self)
     }
 
@@ -557,17 +558,11 @@ final class PlaybackEngine {
 
         switch type {
         case .began:
+            pausedByInterruption = true
             pause()
         case .ended:
-            let optionsValue = notification.userInfo?[AVAudioSessionInterruptionOptionKey] as? UInt ?? 0
-            let options = AVAudioSession.InterruptionOptions(rawValue: optionsValue)
-            if options.contains(.shouldResume) {
-                try? AVAudioSession.sharedInstance().setActive(true)
-                if !audioEngine.isRunning {
-                    try? audioEngine.start()
-                }
-                resume()
-            }
+            pausedByInterruption = false
+            // Do NOT auto-resume. Let the user resume manually.
         @unknown default:
             break
         }
