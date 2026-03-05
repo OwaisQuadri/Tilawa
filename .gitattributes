@@ -1,2 +1,2 @@
-# Always keep the PR branch's version of test notes during merges
-TestFlight/WhatToTest.en-CA.txt merge=ours
+# Combine test notes from both sides during merges/rebases (union avoids silent overwrites with merge=ours during rebase)
+TestFlight/WhatToTest.en-CA.txt merge=union
