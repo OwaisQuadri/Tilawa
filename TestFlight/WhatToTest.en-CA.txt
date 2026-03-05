@@ -1,2 +1,3 @@
-- Repeat progress is now shown in the mini player bar — set verse or range repeat in playback settings and the current repeat count (e.g. "Ayah 2/5" or "Range 1/3") appears below the reciter name during playback.
-- New "Verse repeats" setting in the Repeat section (visible when both verse repeat and range repeat are greater than 1): "Every range pass" repeats each verse on every pass through the range; "First pass only" repeats verses on the first pass and plays each verse once on subsequent passes.
+- Delete a CDN reciter's last source via swipe-delete — the reciter should disappear from Reciters tab, Priority list, and all segment overrides immediately.
+- Reassign a recording to a different reciter — the previous reciter should disappear from Priority list and segment overrides if it now has no sources.
+- Add a personal recording (file, video, or YouTube) — the reciter should appear in Priority list AND any existing segment overrides automatically.

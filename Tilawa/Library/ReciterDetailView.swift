@@ -22,6 +22,7 @@ struct ReciterDetailView: View {
     let reciter: Reciter
 
     @Environment(\.modelContext) private var context
+    @Environment(\.dismiss) private var dismiss
     @Environment(PlaybackViewModel.self) private var playbackVM
 
     @Query private var allSegments: [RecordingSegment]
@@ -290,6 +291,16 @@ struct ReciterDetailView: View {
     private func deleteCDNSource(_ source: ReciterCDNSource) {
         reciter.cdnSources = (reciter.cdnSources ?? []).filter { $0.id != source.id }
         context.delete(source)
+        // If the reciter is now an orphan (no CDN, no personal recordings), delete it and go back
+        if (reciter.cdnSources ?? []).isEmpty && !reciter.hasPersonalRecordings {
+            if let id = reciter.id {
+                PlaybackSettings.cleanupPriorityEntries(for: id, in: context)
+            }
+            context.delete(reciter)
+            try? context.save()
+            dismiss()
+            return
+        }
         try? context.save()
         buildSources()
     }

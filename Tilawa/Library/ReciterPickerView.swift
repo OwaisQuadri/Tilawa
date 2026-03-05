@@ -86,7 +86,15 @@ struct ReciterPickerView: View {
     }
 
     private func assign(_ reciter: Reciter?) {
+        let previous = recording.reciter
         recording.reciter = reciter
+        // If the previous reciter is now an orphan, delete it immediately
+        if let previous, previous.id != reciter?.id, !previous.hasCDN, !previous.hasPersonalRecordings {
+            if let id = previous.id {
+                PlaybackSettings.cleanupPriorityEntries(for: id, in: context)
+            }
+            context.delete(previous)
+        }
         try? context.save()
         dismiss()
     }
@@ -94,7 +102,12 @@ struct ReciterPickerView: View {
     private func deleteOrphanReciters() {
         let orphans = allReciters.filter { !$0.hasCDN && !$0.hasPersonalRecordings }
         guard !orphans.isEmpty else { return }
-        orphans.forEach { context.delete($0) }
+        orphans.forEach { reciter in
+            if let id = reciter.id {
+                PlaybackSettings.cleanupPriorityEntries(for: id, in: context)
+            }
+            context.delete(reciter)
+        }
         try? context.save()
     }
 }

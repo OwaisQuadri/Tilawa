@@ -105,4 +105,20 @@ final class PlaybackSettings {
             .filter { $0.isEnabled ?? true }
             .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
     }
+
+    /// Removes all ReciterPriorityEntry and SegmentReciterEntry items referencing `reciterId`.
+    /// Call this before deleting a Reciter so stale UUID references don't accumulate.
+    static func cleanupPriorityEntries(for reciterId: UUID, in context: ModelContext) {
+        guard let settings = try? context.fetch(FetchDescriptor<PlaybackSettings>()).first else { return }
+
+        let staleGlobal = (settings.reciterPriority ?? []).filter { $0.reciterId == reciterId }
+        staleGlobal.forEach { context.delete($0) }
+        settings.reciterPriority = (settings.reciterPriority ?? []).filter { $0.reciterId != reciterId }
+
+        for override in settings.segmentOverrides ?? [] {
+            let staleSegment = (override.reciterPriority ?? []).filter { $0.reciterId == reciterId }
+            staleSegment.forEach { context.delete($0) }
+            override.reciterPriority = (override.reciterPriority ?? []).filter { $0.reciterId != reciterId }
+        }
+    }
 }
