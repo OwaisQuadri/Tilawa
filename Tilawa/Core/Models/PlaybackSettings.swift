@@ -25,6 +25,7 @@ final class PlaybackSettings {
     // --- Repeat ---
     var ayahRepeatCount: Int?       // 1–100, or -1 = infinite
     var rangeRepeatCount: Int?      // 1–100, or -1 = infinite
+    var rangeRepeatBehavior: String?   // RangeRepeatBehavior.rawValue
 
     // --- After-Range-Repeat Behavior ---
     var afterRepeatAction: String?  // AfterRepeatAction.rawValue
@@ -59,6 +60,7 @@ final class PlaybackSettings {
         self.connectionAyahBefore = nil; self.connectionAyahAfter = nil
         self.playbackSpeed = nil; self.gapBetweenAyaatMs = nil
         self.ayahRepeatCount = nil; self.rangeRepeatCount = nil
+        self.rangeRepeatBehavior = nil
         self.afterRepeatAction = nil
         self.afterRepeatContinueAyaatCount = nil; self.afterRepeatContinuePagesCount = nil
         self.selectedRiwayah = nil
@@ -94,6 +96,9 @@ final class PlaybackSettings {
     var safeRiwayah: Riwayah { Riwayah(rawValue: selectedRiwayah ?? "") ?? .hafs }
     var safeAfterRepeatAction: AfterRepeatAction {
         AfterRepeatAction(rawValue: afterRepeatAction ?? "") ?? .stop
+    }
+    var safeRangeRepeatBehavior: RangeRepeatBehavior {
+        RangeRepeatBehavior(rawValue: rangeRepeatBehavior ?? "") ?? .whileRepeatingAyahs
     }
     var sortedReciterPriority: [ReciterPriorityEntry] {
         (reciterPriority ?? [])
