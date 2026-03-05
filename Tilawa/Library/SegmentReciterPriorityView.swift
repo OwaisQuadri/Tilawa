@@ -16,7 +16,6 @@ struct SegmentReciterPriorityView: View {
     @State private var endAyah:    Int = 7
 
     @State private var orderedEntries: [SegmentReciterEntry] = []
-    @State private var hasInitialized = false
 
     private let metadata = QuranMetadataService.shared
 
@@ -36,11 +35,8 @@ struct SegmentReciterPriorityView: View {
         }
         .navigationTitle(navigationTitle)
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            guard !hasInitialized else { return }
-            loadState()
-            hasInitialized = true
-        }
+        .onAppear { loadState() }
+        .onChange(of: allReciters.count) { _, _ in loadState() }
     }
 
     // MARK: - Sections
@@ -130,17 +126,20 @@ struct SegmentReciterPriorityView: View {
         endSurah   = segmentOverride.endSurah   ?? 1
         endAyah    = segmentOverride.endAyah    ?? 7
 
-        // Purge stale entries pointing to reciters that no longer exist
-        let knownIds = Set(allReciters.compactMap { $0.id })
+        // Mirror RecitersView: only reciters with CDN or personal recordings are valid
+        let validReciters = allReciters.filter { $0.hasCDN || $0.hasPersonalRecordings }
+        let validIds = Set(validReciters.compactMap { $0.id })
+
+        // Purge stale entries pointing to reciters that no longer exist or have no audio
         let stale = (segmentOverride.reciterPriority ?? []).filter {
             guard let id = $0.reciterId else { return true }
-            return !knownIds.contains(id)
+            return !validIds.contains(id)
         }
         if !stale.isEmpty {
             stale.forEach { context.delete($0) }
             segmentOverride.reciterPriority = (segmentOverride.reciterPriority ?? []).filter { entry in
                 guard let id = entry.reciterId else { return false }
-                return knownIds.contains(id)
+                return validIds.contains(id)
             }
             try? context.save()
         }
@@ -148,11 +147,11 @@ struct SegmentReciterPriorityView: View {
         orderedEntries = (segmentOverride.reciterPriority ?? [])
             .sorted { ($0.order ?? 0) < ($1.order ?? 0) }
 
-        // Auto-add any reciter with audio that isn't in this segment's list yet (at the bottom)
+        // Auto-add any valid reciter with audio that isn't in this segment's list yet (at the bottom)
         let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
-        let unlisted = allReciters.filter { r in
+        let unlisted = validReciters.filter { r in
             guard let id = r.id else { return false }
-            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
+            return !listedIds.contains(id)
         }
         guard !unlisted.isEmpty else { return }
         let maxOrder = orderedEntries.compactMap { $0.order }.max() ?? -1

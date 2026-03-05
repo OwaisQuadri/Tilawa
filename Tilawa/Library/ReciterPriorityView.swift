@@ -19,6 +19,10 @@ struct ReciterPriorityView: View {
 
     private var settings: PlaybackSettings? { allSettings.first }
 
+    private var validReciterIds: Set<UUID> {
+        Set(allReciters.filter { $0.hasCDN || $0.hasPersonalRecordings }.compactMap { $0.id })
+    }
+
     private let metadata = QuranMetadataService.shared
 
     var body: some View {
@@ -29,10 +33,8 @@ struct ReciterPriorityView: View {
         .navigationTitle("Reciter Priority")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { loadOrder(); loadSegments() }
-        .onChange(of: settings?.reciterPriority?.count) { _, _ in
-            // Re-sync if entries are added/removed externally (e.g. manifest import)
-            loadOrder()
-        }
+        .onChange(of: settings?.reciterPriority?.count) { _, _ in loadOrder() }
+        .onChange(of: allReciters.count) { _, _ in loadOrder() }
         .onChange(of: settings?.segmentOverrides?.count) { _, _ in loadSegments() }
     }
 
@@ -102,7 +104,10 @@ struct ReciterPriorityView: View {
             }
             return "\(startName) \(range.start.surah):\(range.start.ayah) – \(endName) \(range.end.surah):\(range.end.ayah)"
         }()
-        let count = (override.reciterPriority ?? []).filter { $0.isEnabled ?? true }.count
+        let count = (override.reciterPriority ?? []).filter {
+            guard let id = $0.reciterId else { return false }
+            return ($0.isEnabled ?? true) && validReciterIds.contains(id)
+        }.count
 
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
@@ -151,28 +156,29 @@ struct ReciterPriorityView: View {
     private func loadOrder() {
         guard let s = settings else { return }
 
-        // Purge stale entries pointing to reciters that no longer exist
-        let knownIds = Set(allReciters.compactMap { $0.id })
+        let validIds = validReciterIds
+
+        // Purge stale entries pointing to reciters that no longer exist or have no audio
         let stale = (s.reciterPriority ?? []).filter {
             guard let id = $0.reciterId else { return true }
-            return !knownIds.contains(id)
+            return !validIds.contains(id)
         }
         if !stale.isEmpty {
             stale.forEach { context.delete($0) }
             s.reciterPriority = (s.reciterPriority ?? []).filter { entry in
                 guard let id = entry.reciterId else { return false }
-                return knownIds.contains(id)
+                return validIds.contains(id)
             }
             try? context.save()
         }
 
         orderedEntries = s.sortedReciterPriority
 
-        // Auto-add any reciter with audio that isn't in the list yet (at the bottom)
+        // Auto-add any valid reciter that isn't in the list yet (at the bottom)
         let listedIds = Set(orderedEntries.compactMap { $0.reciterId })
         let unlisted = allReciters.filter { r in
             guard let id = r.id else { return false }
-            return !listedIds.contains(id) && (r.hasCDN || r.hasPersonalRecordings)
+            return !listedIds.contains(id) && validIds.contains(id)
         }
         guard !unlisted.isEmpty else { return }
         let maxOrder = orderedEntries.compactMap { $0.order }.max() ?? -1
