@@ -13,26 +13,18 @@ struct TilawaApp: App {
     )
 
     static let sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            PlaybackSettings.self,
-            ReciterPriorityEntry.self,
-            ReciterSegmentOverride.self,
-            SegmentReciterEntry.self,
-            Reciter.self,
-            ReciterCDNSource.self,
-            Recording.self,
-            RecordingSegment.self,
-            AyahMarker.self,
-            UserBookmark.self,
-            ListeningSession.self,
-        ])
         // CloudKit sync is deferred until the iCloud entitlement is added.
         // To enable: replace ModelConfiguration with:
         //   ModelConfiguration("TilawaCloud", schema: schema, cloudKitDatabase: .automatic)
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(isStoredInMemoryOnly: false)
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(for: Schema([
+                PlaybackSettings.self, ReciterPriorityEntry.self, ReciterSegmentOverride.self,
+                SegmentReciterEntry.self, Reciter.self, ReciterCDNSource.self,
+                Recording.self, RecordingSegment.self, AyahMarker.self,
+                UserBookmark.self, ListeningSession.self
+            ]), configurations: modelConfiguration)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }

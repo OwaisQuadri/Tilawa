@@ -34,16 +34,7 @@ final class RecordingLibraryServiceImpl: RecordingLibraryService, @unchecked Sen
             return startAyah <= ayah && ayah <= endAyah
         }
         guard !inRange.isEmpty, let reciterId = reciter.id else { return inRange }
-        // Filter by reciter using a forward @Relationship chain instead of the back-reference
-        // seg.recording?.reciter?.id, which is unreliable in a background ModelContext.
-        // Fetch the reciter in this context, then walk reciter → recordings → segments
-        // (all @Relationship-decorated forward links) to build a set of valid segment IDs.
-        let reciterDesc = FetchDescriptor<Reciter>(predicate: #Predicate { $0.id == reciterId })
-        guard let bgReciter = (try? ctx.fetch(reciterDesc))?.first else { return inRange }
-        let validSegIDs = Set(
-            (bgReciter.recordings ?? []).flatMap { $0.segments ?? [] }.map { $0.persistentModelID }
-        )
-        guard !validSegIDs.isEmpty else { return inRange }
-        return inRange.filter { validSegIDs.contains($0.persistentModelID) }
+        // Filter directly by the segment's own reciter relationship (stored forward link).
+        return inRange.filter { $0.reciter?.id == reciterId }
     }
 }

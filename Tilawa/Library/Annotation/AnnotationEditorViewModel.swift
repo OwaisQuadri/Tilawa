@@ -115,7 +115,7 @@ final class AnnotationEditorViewModel {
         // 3. Build RecordingSegments via state machine.
         //    assignedSurah/assignedAyah       = start ayah at this marker (new segment opens here)
         //    assignedEndSurah/assignedEndAyah = end ayah at this marker   (previous segment closes here)
-        var pendingStart: (time: Double, surah: Int, ayah: Int)? = nil
+        var pendingStart: (time: Double, surah: Int, ayah: Int, reciterID: UUID?, riwayah: String?)? = nil
         var createdSegments = 0
 
         for marker in allSorted {
@@ -138,6 +138,11 @@ final class AnnotationEditorViewModel {
                 seg.isCrosssurahSegment = (endSurah != start.surah)
                 seg.isManuallyAnnotated = true
                 seg.confidenceScore = 1.0
+                if let rid = start.reciterID {
+                    let desc = FetchDescriptor<Reciter>(predicate: #Predicate { $0.id == rid })
+                    seg.reciter = (try? context.fetch(desc))?.first
+                }
+                seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
                 context.insert(seg)
                 createdSegments += 1
                 pendingStart = nil
@@ -161,6 +166,11 @@ final class AnnotationEditorViewModel {
                 seg.isCrosssurahSegment = (endRef.surah != start.surah)
                 seg.isManuallyAnnotated = true
                 seg.confidenceScore = 1.0
+                if let rid = start.reciterID {
+                    let desc = FetchDescriptor<Reciter>(predicate: #Predicate { $0.id == rid })
+                    seg.reciter = (try? context.fetch(desc))?.first
+                }
+                seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
                 context.insert(seg)
                 createdSegments += 1
                 pendingStart = nil
@@ -168,7 +178,7 @@ final class AnnotationEditorViewModel {
 
             // Open a new segment if this marker has a start ayah
             if hasStart, let sS = marker.assignedSurah, let sA = marker.assignedAyah {
-                pendingStart = (markerPos, sS, sA)
+                pendingStart = (markerPos, sS, sA, marker.reciterID, marker.riwayah)
             }
         }
 
@@ -183,6 +193,11 @@ final class AnnotationEditorViewModel {
             )
             seg.isManuallyAnnotated = true
             seg.confidenceScore = 1.0
+            if let rid = start.reciterID {
+                let desc = FetchDescriptor<Reciter>(predicate: #Predicate { $0.id == rid })
+                seg.reciter = (try? context.fetch(desc))?.first
+            }
+            seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
             context.insert(seg)
             createdSegments += 1
         }
@@ -277,6 +292,8 @@ final class AnnotationEditorViewModel {
         let sorted = segments.sorted { ($0.startOffsetSeconds ?? 0) < ($1.startOffsetSeconds ?? 0) }
 
         var boundaries: [Double: (start: AyahRef?, end: AyahRef?)] = [:]
+        var startReciterIDs: [Double: UUID] = [:]
+        var startRiwayahs: [Double: String] = [:]
         for seg in sorted {
             let sPos = seg.startOffsetSeconds ?? 0
             let ePos = seg.endOffsetSeconds ?? recording.safeDuration
@@ -285,6 +302,8 @@ final class AnnotationEditorViewModel {
                                    ayah: seg.endAyahNumber  ?? seg.ayahNumber  ?? 1)
 
             var s = boundaries[sPos] ?? (nil, nil); s.start = startRef; boundaries[sPos] = s
+            if let rid = seg.reciter?.id { startReciterIDs[sPos] = rid }
+            if let r = seg.riwayah { startRiwayahs[sPos] = r }
             var e = boundaries[ePos] ?? (nil, nil); e.end   = endRef;   boundaries[ePos] = e
         }
 
@@ -295,6 +314,8 @@ final class AnnotationEditorViewModel {
             marker.assignedEndSurah = refs.end?.surah
             marker.assignedEndAyah  = refs.end?.ayah
             marker.isConfirmed      = refs.start != nil || refs.end != nil
+            marker.reciterID        = startReciterIDs[pos]
+            marker.riwayah          = startRiwayahs[pos]
             context.insert(marker)
         }
         try? context.save()

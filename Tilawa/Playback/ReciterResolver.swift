@@ -14,11 +14,15 @@ final class ReciterResolver {
 
     private let libraryService: any RecordingLibraryService
     private let cache: AudioFileCache
+    private let compatibilityService: RiwayahCompatibilityService
+    private let metadata = QuranMetadataService.shared
 
     init(libraryService: any RecordingLibraryService = StubRecordingLibraryService(),
-         cache: AudioFileCache = .shared) {
+         cache: AudioFileCache = .shared,
+         compatibilityService: RiwayahCompatibilityService = .shared) {
         self.libraryService = libraryService
         self.cache = cache
+        self.compatibilityService = compatibilityService
     }
 
     func resolve(ref: AyahRef,
@@ -31,7 +35,7 @@ final class ReciterResolver {
 
             struct SourceAttempt {
                 let effectiveOrder: Int
-                let tiebreaker: Int   // personal=0, cdnManifest=1, cdnTemplate=2
+                let tiebreaker: Int   // personalExact=0, personalCompatible=1, cdnManifest=2, cdnTemplate=3
                 let subRank: Int
                 let resolve: () async -> AyahAudioItem?
             }
@@ -57,28 +61,51 @@ final class ReciterResolver {
                 return lhsDate > rhsDate
             }
 
+            // Pre-compute compatible riwayaat for this ref — used for both personal and CDN.
+            let compatibles = compatibilityService.compatibleRiwayaat(
+                surah: ref.surah, ayah: ref.ayah, targetRiwayah: snapshot.riwayah)
+
             for (rank, seg) in sortedSegments.enumerated() {
+                let isExact = seg.safeRiwayah == snapshot.riwayah
+                guard compatibles.contains(seg.safeRiwayah) else { continue }
+                // For compatible (non-exact) segments, verify compatibility holds for every ayah
+                // in the segment range — the engine plays the segment audio across the full range.
+                if !isExact {
+                    let segStart = AyahRef(surah: seg.surahNumber    ?? ref.surah,
+                                           ayah:  seg.ayahNumber     ?? ref.ayah)
+                    let segEnd   = AyahRef(surah: seg.endSurahNumber ?? ref.surah,
+                                           ayah:  seg.endAyahNumber  ?? ref.ayah)
+                    guard isCompatibleAcrossRange(segRiwayah: seg.safeRiwayah,
+                                                  targetRiwayah: snapshot.riwayah,
+                                                  from: segStart, to: segEnd) else { continue }
+                }
                 attempts.append(SourceAttempt(
                     effectiveOrder: seg.userSortOrder ?? Int.max,
-                    tiebreaker: 0,
+                    tiebreaker: isExact ? 0 : 1,
                     subRank: rank,
                     resolve: { [weak self] in
-                        guard seg.safeRiwayah == snapshot.riwayah else { return nil }
                         return await self?.resolveSegmentItem(seg, ref: ref)
                     }
                 ))
             }
 
-            // CDN sources — one attempt per source, gated on the source's riwayah
+            // CDN sources — gate on compatibility (exact = tiebreaker 2/3; compatible = 4/5).
             for (idx, source) in (reciter.cdnSources ?? []).enumerated() {
-                let tiebreaker = source.urlTemplate != nil ? 2 : 1
+                guard let raw = source.riwayah,
+                      let sourceRiwayah = Riwayah(rawValue: raw),
+                      compatibles.contains(sourceRiwayah) else { continue }
+                let isExact = sourceRiwayah == snapshot.riwayah
+                let tiebreaker: Int
+                if isExact {
+                    tiebreaker = source.urlTemplate != nil ? 3 : 2
+                } else {
+                    tiebreaker = source.urlTemplate != nil ? 5 : 4
+                }
                 attempts.append(SourceAttempt(
                     effectiveOrder: source.sortOrder ?? Int.max,
                     tiebreaker: tiebreaker,
                     subRank: idx,
                     resolve: { [weak self] in
-                        guard let raw = source.riwayah,
-                              Riwayah(rawValue: raw) == snapshot.riwayah else { return nil }
                         return await self?.resolveCDN(ref: ref, reciter: reciter, source: source)
                     }
                 ))
@@ -116,8 +143,8 @@ final class ReciterResolver {
             audioURL: url,
             startOffset: seg.startOffsetSeconds ?? 0,
             endOffset: seg.endOffsetSeconds ?? duration,
-            reciterName: recording.reciter?.safeName ?? "Personal Recording",
-            reciterId: recording.reciter?.id ?? UUID(),
+            reciterName: seg.reciter?.safeName ?? "Personal Recording",
+            reciterId: seg.reciter?.id ?? UUID(),
             isPersonalRecording: true
         )
     }
@@ -155,6 +182,29 @@ final class ReciterResolver {
             reciterId: reciter.id ?? UUID(),
             isPersonalRecording: false
         )
+    }
+
+    // MARK: - Range compatibility
+
+    /// Returns true if `segRiwayah` is compatible with `targetRiwayah` at every ayah from
+    /// `start` through `end` (inclusive). Short-circuits on the first incompatible ayah.
+    private func isCompatibleAcrossRange(segRiwayah: Riwayah,
+                                          targetRiwayah: Riwayah,
+                                          from start: AyahRef,
+                                          to end: AyahRef) -> Bool {
+        var current = start
+        while current <= end {
+            let compatibles = compatibilityService.compatibleRiwayaat(
+                surah: current.surah, ayah: current.ayah, targetRiwayah: targetRiwayah)
+            if !compatibles.contains(segRiwayah) { return false }
+            let count = metadata.ayahCount(surah: current.surah)
+            if current.ayah < count {
+                current = AyahRef(surah: current.surah, ayah: current.ayah + 1)
+            } else if current.surah < 114 {
+                current = AyahRef(surah: current.surah + 1, ayah: 1)
+            } else { break }
+        }
+        return true
     }
 
     // MARK: - Local storage

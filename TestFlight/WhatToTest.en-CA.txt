@@ -2,6 +2,7 @@
 - Download reciter audio for a surah to listen offline.
 - Import personal recordings from audio or video files via the Library tab.
 - Import audio from YouTube by pasting a video link — download progress is shown inline with a stop button to cancel.
-- Annotate a recording with ayah markers to navigate by verse during playback.
+- Annotate a recording with ayah markers to navigate by verse during playback. NEW: Assign a riwayah per marker to mix different text variants in a single recording.
 - Manage which reciters appear in playback using the priority list in the Library tab.
-- Switch reciters and surahs from the playback screen without leaving the player.
+- Switch reciters and surahs from the playback screen without leaving the player. NEW: FROM/TO ayah pickers now respect riwayah compatibility and reciter availability — unavailable ayahs are filtered out automatically.
+- Play a recording with mixed riwayaat (e.g., Hafs and Warsh in the same file) — the engine selects compatible segments based on the target riwayah.

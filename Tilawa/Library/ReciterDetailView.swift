@@ -31,7 +31,7 @@ struct ReciterDetailView: View {
     @State private var showAddCDNSource = false
 
     private var reciterSegments: [RecordingSegment] {
-        allSegments.filter { $0.recording?.reciter?.id == reciter.id }
+        allSegments.filter { $0.reciter?.id == reciter.id }
     }
 
     private var hasUnsavedChanges: Bool {

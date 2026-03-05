@@ -14,14 +14,11 @@ final class Recording {
     var importedAt: Date?
     var recordedAt: Date?
     var annotationStatus: String?     // AnnotationStatus.rawValue
-    var riwayah: String?              // Riwayah.rawValue — overrides reciter's riwayah for this recording
     var notes: String?
 
     // Denormalized coverage cache
     var coversSurahStart: Int?
     var coversSurahEnd: Int?
-
-    var reciter: Reciter?
 
     @Relationship(deleteRule: .cascade)
     var segments: [RecordingSegment]?
@@ -35,9 +32,9 @@ final class Recording {
         self.title = nil; self.sourceFileName = nil; self.storagePath = nil
         self.durationSeconds = nil; self.fileFormat = nil; self.fileSizeBytes = nil
         self.importedAt = nil; self.recordedAt = nil
-        self.annotationStatus = nil; self.riwayah = nil; self.notes = nil
+        self.annotationStatus = nil; self.notes = nil
         self.coversSurahStart = nil; self.coversSurahEnd = nil
-        self.reciter = nil; self.segments = nil; self.markers = nil
+        self.segments = nil; self.markers = nil
     }
 
     // MARK: - Convenience initializer
@@ -52,12 +49,27 @@ final class Recording {
 
     // MARK: - Safe computed properties
     var safeTitle: String { title ?? "Untitled Recording" }
-    var safeRiwayah: Riwayah { Riwayah(rawValue: riwayah ?? "") ?? .hafs }
     var safeDuration: Double { durationSeconds ?? 0 }
     var annotationStatusEnum: AnnotationStatus {
         AnnotationStatus(rawValue: annotationStatus ?? "") ?? .unannotated
     }
     var sortedSegments: [RecordingSegment] {
         (segments ?? []).sorted { ($0.startOffsetSeconds ?? 0) < ($1.startOffsetSeconds ?? 0) }
+    }
+
+    /// Deduplicated riwayahs across all segments, in order of first appearance.
+    var riwayahs: [Riwayah] {
+        var seen = Set<Riwayah>()
+        return (segments ?? []).compactMap { Riwayah(rawValue: $0.riwayah ?? "") }.filter {
+            seen.insert($0).inserted
+        }
+    }
+
+    /// Deduplicated, non-nil reciters across all segments, in order of first appearance.
+    var reciters: [Reciter] {
+        var seen = Set<UUID>()
+        return (segments ?? []).compactMap { $0.reciter }.filter {
+            seen.insert($0.id ?? UUID()).inserted
+        }
     }
 }

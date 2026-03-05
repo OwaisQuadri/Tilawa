@@ -42,27 +42,15 @@ struct RecordingDetailView: View {
                 if let date = recording.importedAt {
                     LabeledContent("Imported", value: date.formatted(date: .abbreviated, time: .shortened))
                 }
-                NavigationLink {
-                    ReciterPickerView(recording: recording)
-                } label: {
-                    LabeledContent("Reciter") {
-                        Text(recording.reciter?.safeName ?? "None")
-                            .foregroundStyle(recording.reciter == nil ? .tertiary : .secondary)
-                    }
+                LabeledContent("Reciters") {
+                    let names = recording.reciters.map(\.safeName)
+                    Text(names.isEmpty ? "None" : names.joined(separator: ", "))
+                        .foregroundStyle(names.isEmpty ? .tertiary : .secondary)
                 }
-                Picker("Riwayah", selection: Binding(
-                    get: { recording.safeRiwayah },
-                    set: { newRiwayah in
-                        recording.riwayah = newRiwayah.rawValue
-                        for segment in recording.segments ?? [] {
-                            segment.riwayah = newRiwayah.rawValue
-                        }
-                        try? context.save()
-                    }
-                )) {
-                    ForEach(Riwayah.allCases, id: \.self) { r in
-                        Text(r.displayName).tag(r)
-                    }
+                LabeledContent("Riwayahs") {
+                    let names = recording.riwayahs.map(\.displayName)
+                    Text(names.isEmpty ? "None" : names.joined(separator: ", "))
+                        .foregroundStyle(names.isEmpty ? .tertiary : .secondary)
                 }
                 LabeledContent("Status") {
                     statusBadge
@@ -109,7 +97,7 @@ struct RecordingDetailView: View {
         let surah = segment.surahNumber ?? 1
         let ayah = segment.ayahNumber ?? 1
         let conflicts = conflictCount(for: segment)
-        let reciterId = recording.reciter?.id
+        let reciterId = segment.reciter?.id
 
         NavigationLink {
             if let rid = reciterId {
@@ -137,14 +125,14 @@ struct RecordingDetailView: View {
 
     /// Returns the number of other segments (from different recordings) covering the same ayah.
     private func conflictCount(for segment: RecordingSegment) -> Int {
-        guard let reciterId = recording.reciter?.id,
+        guard let reciterId = segment.reciter?.id,
               let surah = segment.surahNumber,
               let ayah = segment.ayahNumber else { return 0 }
 
         return allSegments.filter {
             $0.surahNumber == surah &&
             $0.ayahNumber == ayah &&
-            $0.recording?.reciter?.id == reciterId &&
+            $0.reciter?.id == reciterId &&
             $0.recording?.id != recording.id
         }.count
     }

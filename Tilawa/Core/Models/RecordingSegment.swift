@@ -21,7 +21,10 @@ final class RecordingSegment {
     var crossSurahJoinOffsetSeconds: Double?
 
     // --- Riwayah (source of truth for personal recordings) ---
-    var riwayah: String?             // Riwayah.rawValue — inherited from recording.riwayah at creation time
+    var riwayah: String?             // Riwayah.rawValue — set per-segment during annotation
+
+    // --- Reciter (direct assignment; nil = unassigned / unknown) ---
+    var reciter: Reciter?
 
     // --- Quality ---
     var isManuallyAnnotated: Bool?
@@ -40,6 +43,7 @@ final class RecordingSegment {
         self.endSurahNumber = nil; self.endAyahNumber = nil
         self.isCrosssurahSegment = nil; self.crossSurahJoinOffsetSeconds = nil
         self.riwayah = nil
+        self.reciter = nil
         self.isManuallyAnnotated = nil; self.confidenceScore = nil
         self.userSortOrder = nil
     }
@@ -56,15 +60,14 @@ final class RecordingSegment {
         self.surahNumber = surah; self.ayahNumber = ayah
         self.endSurahNumber = surah; self.endAyahNumber = ayah
         self.isCrosssurahSegment = false
-        self.riwayah = recording.riwayah
+        // riwayah is set explicitly during annotation; defaults to nil here
         self.isManuallyAnnotated = false
         self.confidenceScore = 0.0
+        // reciter is intentionally nil — set during annotation
     }
 
     // MARK: - Safe computed properties
-    var safeRiwayah: Riwayah { Riwayah(rawValue: riwayah ?? "") ?? recording?.safeRiwayah ?? .hafs }
-    /// The reciter this segment belongs to (via its parent recording).
-    var reciter: Reciter? { recording?.reciter }
+    var safeRiwayah: Riwayah { Riwayah(rawValue: riwayah ?? "") ?? .hafs }
     var safeDuration: Double { (endOffsetSeconds ?? 0) - (startOffsetSeconds ?? 0) }
     var primaryAyahRef: AyahRef { AyahRef(surah: surahNumber ?? 1, ayah: ayahNumber ?? 1) }
     var endAyahRef: AyahRef {
