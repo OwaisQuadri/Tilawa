@@ -149,32 +149,44 @@ final class LibraryViewModel {
 
     // MARK: - Priority list management
 
-    /// Adds a reciter to PlaybackSettings.reciterPriority if not already present.
-    /// Personal reciters are inserted at order 0 (top); CDN reciters appended at end.
+    /// Adds a reciter to PlaybackSettings.reciterPriority and all segment overrides if not already present.
+    /// Personal reciters are inserted at order 0 (top) of the global list; CDN reciters appended at end.
     func addToPlaybackPriority(reciter: Reciter?, context: ModelContext, isPersonal: Bool) {
         guard let reciter, let reciterId = reciter.id else { return }
 
         let settingsDescriptor = FetchDescriptor<PlaybackSettings>()
         guard let settings = try? context.fetch(settingsDescriptor).first else { return }
 
+        // Global priority
         let alreadyInList = (settings.reciterPriority ?? [])
             .contains { $0.reciterId == reciterId }
-        guard !alreadyInList else { return }
-
-        let newOrder: Int
-        if isPersonal {
-            // Shift all existing entries down to make room at slot 0
-            for entry in settings.reciterPriority ?? [] {
-                entry.order = (entry.order ?? 0) + 1
+        if !alreadyInList {
+            let newOrder: Int
+            if isPersonal {
+                // Shift all existing entries down to make room at slot 0
+                for entry in settings.reciterPriority ?? [] {
+                    entry.order = (entry.order ?? 0) + 1
+                }
+                newOrder = 0
+            } else {
+                newOrder = ((settings.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1) + 1
             }
-            newOrder = 0
-        } else {
-            newOrder = ((settings.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1) + 1
+            let entry = ReciterPriorityEntry(order: newOrder, reciterId: reciterId)
+            context.insert(entry)
+            settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
         }
 
-        let entry = ReciterPriorityEntry(order: newOrder, reciterId: reciterId)
-        context.insert(entry)
-        settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
+        // Segment overrides — sync reciter into each override that doesn't already have it
+        for segment in settings.segmentOverrides ?? [] {
+            let alreadyInSegment = (segment.reciterPriority ?? [])
+                .contains { $0.reciterId == reciterId }
+            guard !alreadyInSegment else { continue }
+            let maxOrder = (segment.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
+            let segEntry = SegmentReciterEntry(order: maxOrder + 1, reciterId: reciterId)
+            context.insert(segEntry)
+            segment.reciterPriority = (segment.reciterPriority ?? []) + [segEntry]
+        }
+
         try? context.save()
     }
 

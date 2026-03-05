@@ -6,3 +6,6 @@
 - Manage which reciters appear in playback using the priority list in the Library tab.
 - Switch reciters and surahs from the playback screen without leaving the player. NEW: FROM/TO ayah pickers now respect riwayah compatibility and reciter availability — unavailable ayahs are filtered out automatically.
 - Play a recording with mixed riwayaat (e.g., Hafs and Warsh in the same file) — the engine selects compatible segments based on the target riwayah.
+- Delete a CDN reciter's last source via swipe-delete — the reciter should disappear from Reciters tab, Priority list, and all segment overrides immediately.
+- Reassign a recording to a different reciter — the previous reciter should disappear from Priority list and segment overrides if it now has no sources.
+- Add a personal recording (file, video, or YouTube) — the reciter should appear in Priority list AND any existing segment overrides automatically.

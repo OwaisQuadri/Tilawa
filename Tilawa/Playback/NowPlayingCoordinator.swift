@@ -1,3 +1,4 @@
+import AVFoundation
 import Foundation
 import MediaPlayer
 
@@ -68,5 +69,6 @@ final class NowPlayingCoordinator {
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = nil
         center.playbackState = .stopped
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }

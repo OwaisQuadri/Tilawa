@@ -1,0 +1,2 @@
+# Always keep the PR branch's version of test notes during merges
+TestFlight/WhatToTest.en-CA.txt merge=ours

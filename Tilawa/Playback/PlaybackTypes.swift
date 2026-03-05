@@ -30,6 +30,7 @@ struct PlaybackSettingsSnapshot: Sendable {
     let ayahRepeatCount: Int        // -1 = infinite
     let rangeRepeatCount: Int       // -1 = infinite
     let afterRepeatAction: AfterRepeatAction
+    let rangeRepeatBehavior: RangeRepeatBehavior
     let afterRepeatContinueAyaatCount: Int
     let afterRepeatContinuePagesCount: Int
     let afterRepeatContinuePagesExtraAyah: Bool

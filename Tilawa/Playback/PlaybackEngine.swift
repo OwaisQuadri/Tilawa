@@ -43,6 +43,7 @@ final class PlaybackEngine {
     private var sessionID: UUID = UUID()   // Invalidated on stop/play to guard stale callbacks
     private var ayahStartDate: Date?       // Wall-clock time when current ayah began playing
     private var pausedElapsedTime: TimeInterval = 0  // Elapsed when last paused
+    private var isInPlainRangePass: Bool = false
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
     private var engineConfigObserver: NSObjectProtocol?
@@ -78,13 +79,18 @@ final class PlaybackEngine {
         // Re-activate audio session to ensure Now Playing eligibility
         try? AVAudioSession.sharedInstance().setActive(true)
         if !audioEngine.isRunning { try? audioEngine.start() }
+        remoteCommands.register(engine: self)
         // Apply speed from settings before scheduling audio
         currentSpeed = settings.speed
         timePitchUnit.rate = Float(settings.speed)
         activeSnapshot = settings
         totalAyahRepetitions = settings.ayahRepeatCount
-        totalRangeRepetitions = settings.rangeRepeatCount
+        // For .afterRepeatingAyahs: total passes = 1 (with repeats) + rangeRepeatCount (plain)
+        totalRangeRepetitions = (settings.rangeRepeatCount != -1 && settings.rangeRepeatBehavior == .afterRepeatingAyahs)
+            ? settings.rangeRepeatCount + 1
+            : settings.rangeRepeatCount
         currentRangeRepetition = 1
+        isInPlainRangePass = false
         ayahQueue = PlaybackQueue.build(range: range, settings: settings, metadata: metadata)
         currentQueueIndex = 0
         print("▶️ PlaybackEngine.play: queue=\(ayahQueue.count) ayaat, reciters=\(settings.reciterPriority.count), riwayah=\(settings.riwayah.rawValue), engineRunning=\(audioEngine.isRunning)")
@@ -126,9 +132,12 @@ final class PlaybackEngine {
         currentQueueIndex = 0
         currentAyahRepetition = 0
         currentRangeRepetition = 0
+        isInPlainRangePass = false
         unavailableAyah = nil
         nowPlaying.clear()
         if deactivateSession {
+            remoteCommands.unregister()
+            audioEngine.stop()
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         }
     }
@@ -147,6 +156,7 @@ final class PlaybackEngine {
             currentQueueIndex = 0
         }
         currentAyahRepetition = 0
+        isInPlainRangePass = false
         playerNode.stop()
         await scheduleCurrentAyah()
     }
@@ -211,6 +221,7 @@ final class PlaybackEngine {
         do {
             try audioEngine.start()
         } catch {
+            nowPlaying.clear()
             state = .error(.engineStartFailed(error))
         }
     }
@@ -377,7 +388,7 @@ final class PlaybackEngine {
         guard let snapshot = activeSnapshot else { return }
 
         let isInfiniteAyahRepeat = totalAyahRepetitions == -1
-        let moreAyahReps = isInfiniteAyahRepeat || currentAyahRepetition < totalAyahRepetitions
+        let moreAyahReps = !isInPlainRangePass && (isInfiniteAyahRepeat || currentAyahRepetition < totalAyahRepetitions)
 
         if moreAyahReps {
             // Schedule gap then repeat
@@ -425,6 +436,7 @@ final class PlaybackEngine {
     private func handleRangeCompletion() async {
         guard let snapshot = activeSnapshot else { return }
 
+        let behavior = snapshot.rangeRepeatBehavior
         let isInfiniteRangeRepeat = totalRangeRepetitions == -1
         let moreRangeReps = isInfiniteRangeRepeat || currentRangeRepetition < totalRangeRepetitions
 
@@ -432,6 +444,10 @@ final class PlaybackEngine {
             currentRangeRepetition += 1
             currentQueueIndex = 0
             currentAyahRepetition = 1
+            // After the first pass in "afterRepeatingAyahs" mode, switch to plain passes
+            if behavior == .afterRepeatingAyahs && currentRangeRepetition > 1 {
+                isInPlainRangePass = true
+            }
             await scheduleCurrentAyah()
         } else {
             state = .rangeComplete
@@ -456,6 +472,8 @@ final class PlaybackEngine {
                 currentQueueIndex = 0
                 currentAyahRepetition = 1
                 currentRangeRepetition = 1
+                try? AVAudioSession.sharedInstance().setActive(true)
+                if !audioEngine.isRunning { try? audioEngine.start() }
                 await scheduleCurrentAyah()
 
             case .continuePages:
@@ -471,6 +489,8 @@ final class PlaybackEngine {
                 currentQueueIndex = 0
                 currentAyahRepetition = 1
                 currentRangeRepetition = 1
+                try? AVAudioSession.sharedInstance().setActive(true)
+                if !audioEngine.isRunning { try? audioEngine.start() }
                 await scheduleCurrentAyah()
             }
         }

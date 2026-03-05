@@ -73,6 +73,7 @@ final class PlaybackViewModel {
             ayahRepeatCount: 1,
             rangeRepeatCount: 1,
             afterRepeatAction: .stop,
+            rangeRepeatBehavior: .whileRepeatingAyahs,
             afterRepeatContinueAyaatCount: 0,
             afterRepeatContinuePagesCount: 0,
             afterRepeatContinuePagesExtraAyah: false,
@@ -114,15 +115,21 @@ final class PlaybackViewModel {
 
     // MARK: - Repetition display
 
+    var ayahRepetitionLabel: String? {
+        guard totalAyahRepetitions != 1 else { return nil }
+        if totalAyahRepetitions == -1 { return "Ayah ∞" }
+        return "Ayah \(currentAyahRepetition)/\(totalAyahRepetitions)"
+    }
+
+    var rangeRepetitionLabel: String? {
+        guard totalRangeRepetitions != 1 else { return nil }
+        if totalRangeRepetitions == -1 { return "Range ∞" }
+        return "Range \(currentRangeRepetition)/\(totalRangeRepetitions)"
+    }
+
     var repetitionLabel: String? {
-        guard totalAyahRepetitions != 1 || totalRangeRepetitions != 1 else { return nil }
-        if totalAyahRepetitions == -1 {
-            return "Rep ∞"
-        }
-        if totalAyahRepetitions > 1 {
-            return "Rep \(currentAyahRepetition)/\(totalAyahRepetitions)"
-        }
-        return nil
+        let parts = [ayahRepetitionLabel, rangeRepetitionLabel].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
     // MARK: - Private
@@ -177,6 +184,7 @@ final class PlaybackViewModel {
             ayahRepeatCount: settings.safeAyahRepeat,
             rangeRepeatCount: settings.safeRangeRepeat,
             afterRepeatAction: settings.safeAfterRepeatAction,
+            rangeRepeatBehavior: settings.safeRangeRepeatBehavior,
             afterRepeatContinueAyaatCount: settings.afterRepeatContinueAyaatCount ?? 0,
             afterRepeatContinuePagesCount: settings.afterRepeatContinuePagesCount ?? 0,
             afterRepeatContinuePagesExtraAyah: settings.afterRepeatContinuePagesExtraAyah ?? false,

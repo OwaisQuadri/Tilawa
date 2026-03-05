@@ -232,6 +232,13 @@ struct PlaybackSetupSheet: View {
                     }
                 }
 
+                if showRangeRepeatBehavior(s) {
+                    Picker("Verse repeats", selection: rangeRepeatBehaviorBinding(s)) {
+                        Text("Every range pass").tag(RangeRepeatBehavior.whileRepeatingAyahs)
+                        Text("First pass only").tag(RangeRepeatBehavior.afterRepeatingAyahs)
+                    }
+                }
+
                 if showAfterRepeat(s) {
                     Picker("After repeating", selection: afterRepeatBinding(s)) {
                         Text("Disabled").tag(0)
@@ -889,6 +896,17 @@ struct PlaybackSetupSheet: View {
 
     private func rangeRepeatBinding(_ s: PlaybackSettings) -> Binding<Int> {
         Binding(get: { s.safeRangeRepeat }, set: { s.rangeRepeatCount = $0; save() })
+    }
+
+    private func rangeRepeatBehaviorBinding(_ s: PlaybackSettings) -> Binding<RangeRepeatBehavior> {
+        Binding(
+            get: { s.safeRangeRepeatBehavior },
+            set: { s.rangeRepeatBehavior = $0.rawValue; save() }
+        )
+    }
+
+    private func showRangeRepeatBehavior(_ s: PlaybackSettings) -> Bool {
+        s.safeAyahRepeat != 1 && s.safeRangeRepeat != 1
     }
 
     /// Encodes afterRepeatAction + count into a single Int tag for the picker.
