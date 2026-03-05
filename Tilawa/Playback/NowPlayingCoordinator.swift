@@ -65,10 +65,12 @@ final class NowPlayingCoordinator {
         center.playbackState = state == .playing ? .playing : .paused
     }
 
-    func clear() {
+    func clear(deactivateSession: Bool = true) {
         let center = MPNowPlayingInfoCenter.default()
         center.nowPlayingInfo = nil
         center.playbackState = .stopped
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if deactivateSession {
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        }
     }
 }
