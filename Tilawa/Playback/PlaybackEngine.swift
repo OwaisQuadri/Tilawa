@@ -48,6 +48,7 @@ final class PlaybackEngine {
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
     private var engineConfigObserver: NSObjectProtocol?
+    private var pausedFromGapState: PlaybackState? = nil   // set when pausing during a gap period
 
     // MARK: - Init
 
@@ -99,20 +100,40 @@ final class PlaybackEngine {
     }
 
     func pause() {
-        guard state == .playing else { return }
-        playerNode.pause()
-        pausedElapsedTime = currentElapsedInAyah()
-        ayahStartDate = nil
-        state = .paused
-        updateNowPlaying()
+        if state == .playing {
+            playerNode.pause()
+            pausedElapsedTime = currentElapsedInAyah()
+            ayahStartDate = nil
+            state = .paused
+            updateNowPlaying()
+        } else if state == .awaitingRepeat || state == .awaitingNextAyah {
+            pausedFromGapState = state
+            playerNode.pause()   // stop the scheduled silence buffer
+            state = .paused
+            updateNowPlaying()
+        }
     }
 
     func resume() {
         guard state == .paused else { return }
-        playerNode.play()
-        ayahStartDate = Date()
-        state = .playing
-        updateNowPlaying()
+        if let gapState = pausedFromGapState {
+            pausedFromGapState = nil
+            playerNode.play()
+            if gapState == .awaitingRepeat {
+                currentAyahRepetition += 1
+                state = .awaitingRepeat
+                Task { @MainActor in await self.scheduleCurrentAyah() }
+            } else {
+                state = .awaitingNextAyah
+                Task { @MainActor in await self.advanceToNextAyah() }
+            }
+            updateNowPlaying()
+        } else {
+            playerNode.play()
+            ayahStartDate = Date()
+            state = .playing
+            updateNowPlaying()
+        }
     }
 
     /// Stop playback and reset all session state.
@@ -123,6 +144,7 @@ final class PlaybackEngine {
         sessionID = UUID()   // Invalidate any in-flight completion callbacks
         ayahStartDate = nil
         pausedElapsedTime = 0
+        pausedFromGapState = nil
         playerNode.stop()
         state = .idle
         currentAyah = nil
@@ -398,6 +420,7 @@ final class PlaybackEngine {
                 scheduleSilenceGap(durationMs: snapshot.gapBetweenAyaatMs)
                 try? await Task.sleep(nanoseconds: UInt64(snapshot.gapBetweenAyaatMs) * 1_000_000)
             }
+            guard state == .awaitingRepeat else { return }  // paused or stopped during gap
             currentAyahRepetition += 1
             await scheduleCurrentAyah()
         } else {
@@ -426,6 +449,7 @@ final class PlaybackEngine {
                 scheduleSilenceGap(durationMs: snapshot.gapBetweenAyaatMs)
                 try? await Task.sleep(nanoseconds: UInt64(snapshot.gapBetweenAyaatMs) * 1_000_000)
             }
+            guard state == .awaitingNextAyah else { return }  // paused or stopped during gap
             await scheduleCurrentAyah()
         } else {
             // End of queue — check range repeat

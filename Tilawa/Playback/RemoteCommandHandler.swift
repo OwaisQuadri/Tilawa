@@ -19,14 +19,16 @@ final class RemoteCommandHandler {
         center.togglePlayPauseCommand.isEnabled = true
         tokens.append(center.togglePlayPauseCommand.addTarget { [weak self] _ in
             guard let engine = self?.engine else { return .noSuchContent }
-            if engine.state == .playing { engine.pause() } else { engine.resume() }
+            let active = engine.state == .playing || engine.state == .awaitingRepeat || engine.state == .awaitingNextAyah
+            if active { engine.pause() } else { engine.resume() }
             return .success
         })
 
         center.playCommand.isEnabled = true
         tokens.append(center.playCommand.addTarget { [weak self] _ in
             guard let engine = self?.engine else { return .noSuchContent }
-            guard engine.state != .playing else { return .commandFailed }
+            guard engine.state != .playing && engine.state != .awaitingRepeat && engine.state != .awaitingNextAyah
+                else { return .commandFailed }
             engine.resume()
             return .success
         })
@@ -34,7 +36,8 @@ final class RemoteCommandHandler {
         center.pauseCommand.isEnabled = true
         tokens.append(center.pauseCommand.addTarget { [weak self] _ in
             guard let engine = self?.engine else { return .noSuchContent }
-            guard engine.state == .playing else { return .commandFailed }
+            guard engine.state == .playing || engine.state == .awaitingRepeat || engine.state == .awaitingNextAyah
+                else { return .commandFailed }
             engine.pause()
             return .success
         })
