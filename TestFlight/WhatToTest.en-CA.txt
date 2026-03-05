@@ -1,5 +1,3 @@
-- Annotate a recording with ayah markers. Assign a start ayah to a marker, then tap "Riwayah" to set a per-marker riwayah (e.g., Warsh). Confirm — the segment should save with that riwayah.
-- Add a second marker after the first — verify the riwayah carries forward automatically from the previous marker.
-- Open the Play modal with a CDN reciter that has limited coverage (e.g., Minshawi). Verify a "Checking available ayaat…" progress indicator appears, FROM/TO pickers are disabled while it runs, then restrict to available ayahs once done.
-- Open the Play modal, select a riwayah, and verify the FROM/TO range only shows ayahs compatible with that riwayah and the selected reciter.
-- Play a recording annotated with mixed riwayaat — verify only segments compatible with the selected riwayah are played.
+- Start playing any recitation, then connect AirPods or a Bluetooth speaker — audio should continue on the new device from the start of the current ayah.
+- Pause playback, then connect a new audio output — playback should remain paused (not auto-start).
+- While playing, unplug wired headphones — playback should pause.
