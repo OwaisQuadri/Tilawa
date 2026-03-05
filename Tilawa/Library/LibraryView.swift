@@ -35,6 +35,10 @@ struct LibraryView: View {
             .sheet(isPresented: $vm.isShowingYouTubeImport) {
                 YouTubeImportView(vm: vm)
             }
+            // Generic URL import
+            .sheet(isPresented: $vm.isShowingURLImport) {
+                URLImportView(vm: vm)
+            }
             // Inline annotation editor
             .sheet(item: $vm.pendingAnnotationRecording) { recording in
                 AnnotationEditorView(recording: recording)
@@ -75,9 +79,16 @@ struct LibraryView: View {
         }
     }
 
+    private var hasActiveURLDownload: Bool {
+        vm.pendingURLImports.contains {
+            if case .downloading = $0.state { return true }
+            return false
+        }
+    }
+
     @ViewBuilder
     private var recordingSection: some View {
-        let hasContent = !recordings.isEmpty || !vm.pendingYouTubeImports.isEmpty
+        let hasContent = !recordings.isEmpty || !vm.pendingYouTubeImports.isEmpty || !vm.pendingURLImports.isEmpty
 
         if !hasContent {
             Section {
@@ -107,6 +118,32 @@ struct LibraryView: View {
                     if hasActiveYouTubeDownload {
                         Label(
                             "Keep the app open while downloading from YouTube — the download will pause if you switch away. Audio and video file imports can finish briefly in the background.",
+                            systemImage: "info.circle"
+                        )
+                        .font(.caption)
+                    }
+                }
+            }
+
+            if !vm.pendingURLImports.isEmpty {
+                Section {
+                    ForEach(vm.pendingURLImports) { task in
+                        URLImportRowView(
+                            task: task,
+                            onStop: { vm.removePendingURLImport(task) }
+                        )
+                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                            if case .failed = task.state {
+                                Button("Delete", systemImage: "trash", role: .destructive) {
+                                    vm.removePendingURLImport(task)
+                                }
+                            }
+                        }
+                    }
+                } footer: {
+                    if hasActiveURLDownload {
+                        Label(
+                            "Keep the app open while downloading — the download will pause if you switch away.",
                             systemImage: "info.circle"
                         )
                         .font(.caption)
@@ -189,6 +226,12 @@ struct LibraryView: View {
             vm.isShowingYouTubeImport = true
         } label: {
             Label("Import from YouTube", systemImage: "play.rectangle.fill")
+        }
+
+        Button {
+            vm.isShowingURLImport = true
+        } label: {
+            Label("Import from URL", systemImage: "link")
         }
     }
 

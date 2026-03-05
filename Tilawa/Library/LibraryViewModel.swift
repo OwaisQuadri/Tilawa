@@ -1,4 +1,5 @@
 import ActivityKit
+import AVFoundation
 import Foundation
 import SwiftData
 import UIKit
@@ -12,17 +13,22 @@ final class LibraryViewModel {
     var isShowingAudioPicker = false
     var isShowingVideoPicker = false
     var isShowingYouTubeImport = false
+    var isShowingURLImport = false
     var pendingAnnotationRecording: Recording?
     var importError: String?
     var isImporting = false
     var importProgress: (current: Int, total: Int, fileName: String)?
     /// In-progress and failed YouTube imports shown as inline rows in the library.
     var pendingYouTubeImports: [YouTubeImportTask] = []
+    /// In-progress and failed generic URL imports shown as inline rows in the library.
+    var pendingURLImports: [URLImportTask] = []
 
     private let importer = AudioImporter()
     private var importActivity: Activity<ImportActivityAttributes>?
     /// Active download tasks keyed by YouTubeImportTask.id; used for pause/cancel.
     private var downloadTasks: [UUID: Task<Void, Never>] = [:]
+    /// Active download tasks keyed by URLImportTask.id; used for cancel.
+    private var urlDownloadTasks: [UUID: Task<Void, Never>] = [:]
 
     // MARK: - Import audio files
 
@@ -98,6 +104,92 @@ final class LibraryViewModel {
         downloadTasks[task.id]?.cancel()
         downloadTasks[task.id] = nil
         pendingYouTubeImports.removeAll { $0.id == task.id }
+    }
+
+    // MARK: - Import from generic URL
+
+    func importFromURL(urlString: String, context: ModelContext) {
+        let task = URLImportTask(urlString: urlString)
+        pendingURLImports.append(task)
+        startURLDownload(for: task, context: context)
+    }
+
+    func removePendingURLImport(_ task: URLImportTask) {
+        urlDownloadTasks[task.id]?.cancel()
+        urlDownloadTasks[task.id] = nil
+        pendingURLImports.removeAll { $0.id == task.id }
+    }
+
+    private func startURLDownload(for task: URLImportTask, context: ModelContext) {
+        let taskID = task.id
+        let urlString = task.urlString
+
+        let downloadTask = Task {
+            do {
+                let (tempURL, title, isVideo) = try await GenericURLImporter().downloadMedia(
+                    from: urlString,
+                    onTitle: { fetchedTitle in
+                        Task { @MainActor [weak self] in
+                            self?.pendingURLImports
+                                .first(where: { $0.id == taskID })?
+                                .title = fetchedTitle
+                        }
+                    },
+                    onProgress: { progress in
+                        Task { @MainActor [weak self] in
+                            guard let task = self?.pendingURLImports
+                                .first(where: { $0.id == taskID }),
+                                  case .downloading = task.state else { return }
+                            task.state = .downloading(progress: progress)
+                        }
+                    }
+                )
+
+                // Extract audio if the downloaded file is a video.
+                let finalURL: URL
+                if isVideo {
+                    let extractedURL = FileManager.default.temporaryDirectory
+                        .appendingPathComponent("\(taskID.uuidString)_extracted.m4a")
+                    let asset = AVURLAsset(url: tempURL)
+                    guard let session = AVAssetExportSession(
+                        asset: asset, presetName: AVAssetExportPresetAppleM4A) else {
+                        try? FileManager.default.removeItem(at: tempURL)
+                        throw ImportError.exportSessionCreationFailed
+                    }
+                    session.outputFileType = .m4a
+                    session.outputURL = extractedURL
+                    await session.export()
+                    try? FileManager.default.removeItem(at: tempURL)
+                    guard session.status == .completed else {
+                        throw ImportError.exportFailed(
+                            session.error?.localizedDescription ?? "Unknown")
+                    }
+                    finalURL = extractedURL
+                } else {
+                    finalURL = tempURL
+                }
+
+                let recordingTitle = title
+                    ?? pendingURLImports.first(where: { $0.id == taskID })?.title
+                    ?? URL(string: urlString)?.lastPathComponent
+                    ?? urlString
+                let recording = try await importer.importDownloadedFile(
+                    at: finalURL, title: recordingTitle, context: context)
+                for reciter in recording.reciters {
+                    addToPlaybackPriority(reciter: reciter, context: context, isPersonal: true)
+                }
+                urlDownloadTasks[taskID] = nil
+                pendingURLImports.removeAll { $0.id == taskID }
+            } catch is CancellationError {
+                urlDownloadTasks[taskID] = nil
+            } catch {
+                urlDownloadTasks[taskID] = nil
+                pendingURLImports
+                    .first(where: { $0.id == taskID })?
+                    .state = .failed(error.localizedDescription)
+            }
+        }
+        urlDownloadTasks[taskID] = downloadTask
     }
 
     private func startDownload(for task: YouTubeImportTask, context: ModelContext) {

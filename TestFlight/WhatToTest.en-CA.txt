@@ -1,8 +1,11 @@
-- Start audio playback in the app. Trigger an incoming phone call (or use the simulator with xcrun simctl to simulate a call). Verify audio pauses immediately when the call begins.
-- After the call ends, verify audio remains paused and does NOT auto-resume. Manually tap play to resume — audio should continue from where it was paused.
-- Verify normal pause/resume functionality (without a phone call interruption) still works correctly.
-- Play a multi-ayah range with ayah repetition > 1 and a gap between repetitions. While audio is in the gap (silence), press the headphone button once — playback should pause.
-- Press the headphone button again — playback should resume and continue with the next repetition (not replay the gap).
-- Play a multi-ayah range. Press the headphone button during the silence between two different ayahs — playback should pause cleanly without advancing to the next ayah.
-- Resume from that paused state — the next ayah should begin playing.
-- Verify the lock screen and Control Center play/pause button behaves the same in all of the above scenarios.
+## Import from URL Feature
+
+- Tap Library > Import > "Import from URL"
+- Paste a direct audio file URL (e.g., an MP3 from a CDN). Verify the URL validates (green checkmark), tap Import, and the file downloads with progress indicator
+- Test with a large file (>5MB) to verify chunked download works correctly
+- Test with a video file URL (e.g., MP4). Verify the audio is extracted and saved as M4A
+- Test with an archive.org /details/ URL (e.g., https://archive.org/details/IDENTIFIER/filename.mp3). Verify it auto-converts to /download/ and imports correctly
+- Test with an invalid URL (missing http/https). Verify the Import button stays disabled and footer shows red X
+- Test with a URL that returns an HTML page instead of audio. Verify it fails with error "The URL returned a web page instead of an audio or video file"
+- After successful import, tap the recording to verify title, duration, and file format are correctly populated
+- Test cancellation: initiate a URL import, wait for download to start, tap the stop button. Verify the row disappears and the recording is not saved
