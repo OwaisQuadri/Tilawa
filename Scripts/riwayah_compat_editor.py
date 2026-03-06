@@ -1,31 +1,59 @@
 #!/usr/bin/env python3
 """
-Riwayah Compatibility Editor
-Usage: python3 Scripts/riwayah_compat_editor.py [SURAH:AYAH | --populate]
+riwayah_compat_editor.py — Interactive CLI for editing riwayah compatibility groups
 
-  --populate   Fill all 6236 ayahs with 20-singleton (unreviewed) entries,
-               preserving any already-reviewed entries.
+USAGE
+    python3 Scripts/riwayah_compat_editor.py [OPTIONS] [SURAH:AYAH]
 
-  SURAH:AYAH   Jump directly to that position (default: first unreviewed ayah).
+ARGUMENTS
+    SURAH:AYAH   Jump directly to that position, e.g. 2:255
+                 (default: first unreviewed ayah)
 
-Editing convention:
-  - 20 groups of 1 each  =  UNREVIEWED  (strict — each riwayah only matches itself)
-  - 1 group of 20        =  all-same   (all riwayaat are compatible here)
-  - 2–19 groups          =  split      (some are compatible, some are not)
+OPTIONS
+    --populate       Fill all 6236 ayahs with 20-singleton (unreviewed) entries,
+                     preserving any already-reviewed entries
+    --reset-all      Reset every entry in the file to 20-singleton (unreviewed).
+                     Asks for confirmation before writing. Cannot be undone.
+    --deploy         Copy Scripts/riwayah_compat_draft.json → Tilawa/Resources/riwayah_compatibility.json
+    --file PATH      Use a specific JSON file instead of the default draft
+                     (default: Scripts/riwayah_compat_draft.json)
+    -h, --help       Show this help
 
-Progress = ayahs that are NOT 20-singletons  /  6236 total.
+WORKFLOW
+    1. Run builder first: python3 Scripts/riwayah_compat_builder.py
+    2. Edit draft:        python3 Scripts/riwayah_compat_editor.py
+    3. Deploy to app:     python3 Scripts/riwayah_compat_editor.py --deploy
+
+FILES
+    Default draft: Scripts/riwayah_compat_draft.json  (app untouched until deploy)
+    App file:      Tilawa/Resources/riwayah_compatibility.json
+
+EDITING CONVENTIONS
+    20 groups of 1    UNREVIEWED — each riwayah only matches itself (strict)
+    1 group of 20     ALL-SAME   — all 20 riwayaat are compatible at this ayah
+    2–19 groups       SPLIT      — partial compatibility (some match, some don't)
+
+PROGRESS
+    Counts ayahs that are NOT the default 20-singleton pattern / 6236 total.
+    An ayah set by the builder (8 riwayahs grouped, 12 singletons) counts as reviewed.
 """
 
 import json
 import os
+import shutil
 import sys
 import readline  # noqa: F401  — enables arrow keys / history in input()
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SCRIPT_DIR    = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT  = os.path.dirname(SCRIPT_DIR)
-COMPAT_JSON   = os.path.join(PROJECT_ROOT, "Tilawa/Resources/riwayah_compatibility.json")
 METADATA_JSON = os.path.join(PROJECT_ROOT, "Tilawa/Resources/QuranData/quran-metadata.json")
+DRAFT_JSON    = os.path.join(SCRIPT_DIR, "riwayah_compat_draft.json")
+APP_JSON      = os.path.join(PROJECT_ROOT, "Tilawa/Resources/riwayah_compatibility.json")
+
+# Defaults to draft; use --file PATH to override
+_file_flag = next((sys.argv[i+1] for i, a in enumerate(sys.argv) if a == "--file" and i+1 < len(sys.argv)), None)
+COMPAT_JSON = os.path.abspath(_file_flag) if _file_flag else DRAFT_JSON
 
 # ── The 20 canonical riwayaat ─────────────────────────────────────────────────
 RIWAYAAT = [
@@ -176,6 +204,7 @@ def print_commands():
     cmds = [
         ("[a]", "all-same"),
         ("[e]", "edit groups"),
+        ("[r]", "reset ayah"),
         ("[d]", "delete"),
         ("[n/↵]", "next"),
         ("[p]", "prev"),
@@ -350,6 +379,11 @@ def run(start_surah=None, start_ayah=None):
             if table != before:
                 dirty = True
 
+        elif raw in ("r", "reset"):
+            table[(surah, ayah)] = [list(g) for g in SINGLETON_GROUPS]
+            dirty = True
+            print(yellow("  ↺ Reset to unreviewed (20 singletons)."))
+
         elif raw in ("d", "delete"):
             key = (surah, ayah)
             if key in table:
@@ -385,6 +419,30 @@ def run(start_surah=None, start_ayah=None):
 
 
 def main():
+    if "-h" in sys.argv or "--help" in sys.argv:
+        print(__doc__)
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--deploy":
+        if not os.path.exists(DRAFT_JSON):
+            print(red("  No draft found. Run the builder first."))
+            sys.exit(1)
+        shutil.copy2(DRAFT_JSON, APP_JSON)
+        print(green(f"  Deployed {os.path.relpath(DRAFT_JSON)} → {os.path.relpath(APP_JSON)}"))
+        return
+
+    if len(sys.argv) > 1 and sys.argv[1] == "--reset-all":
+        confirm = input(red("  Reset ALL entries to unreviewed? This cannot be undone. [yes/N]: ")).strip()
+        if confirm.lower() == "yes":
+            table = load_compat()
+            for key in table:
+                table[key] = [list(g) for g in SINGLETON_GROUPS]
+            save_compat(table)
+            print(yellow(f"  ↺ Reset {len(table)} entries to unreviewed."))
+        else:
+            print(dim("  Cancelled."))
+        return
+
     if len(sys.argv) > 1 and sys.argv[1] in ("--populate", "-p"):
         surahs, _, _ = load_metadata()
         table = load_compat()
@@ -400,7 +458,7 @@ def main():
     if len(sys.argv) > 1:
         ref = parse_ref(sys.argv[1])
         if ref is None:
-            print(red(f"Usage: {sys.argv[0]} [SURAH:AYAH | --populate]"))
+            print(red(f"Usage: {sys.argv[0]} [SURAH:AYAH | --populate | --reset-all | --deploy | -h]"))
             sys.exit(1)
         start_surah, start_ayah = ref
 
