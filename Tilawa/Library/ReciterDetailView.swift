@@ -21,6 +21,8 @@ struct ReciterDetailView: View {
 
     let reciter: Reciter
 
+    private let dm = DownloadManager.shared
+
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
     @Environment(PlaybackViewModel.self) private var playbackVM
@@ -30,6 +32,7 @@ struct ReciterDetailView: View {
     @State private var sources: [ReciterSourceItem] = []
     @State private var savedSourceOrder: [String] = []
     @State private var showAddCDNSource = false
+    @State private var cacheSize: Int64 = 0
 
     private var reciterSegments: [RecordingSegment] {
         allSegments.filter { $0.reciter?.id == reciter.id }
@@ -101,6 +104,7 @@ struct ReciterDetailView: View {
             }
         }
         .onAppear { buildSources() }
+        .task { cacheSize = await AudioFileCache.shared.cacheSize(for: reciter) }
         .onChange(of: reciterSegments.count) { _, _ in buildSources() }
         .sheet(isPresented: $showAddCDNSource, onDismiss: buildSources) {
             ManifestImportView(targetReciter: reciter)
@@ -132,6 +136,15 @@ struct ReciterDetailView: View {
                         Text(String(preview.prefix(40)))
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+                    if let job = dm.activeJob(for: reciter.id ?? UUID()) {
+                        ProgressView(value: job.overall)
+                            .controlSize(.mini)
+                        Text(job.statusText)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        coverageBadge(cached: reciter.downloadedSurahs.count)
                     }
                 }
             }
@@ -193,6 +206,32 @@ struct ReciterDetailView: View {
             .buttonStyle(.plain)
         }
         .padding(.vertical, 2)
+    }
+
+    // MARK: - CDN Status
+
+    @ViewBuilder
+    private func coverageBadge(cached: Int) -> some View {
+        let sizeLabel = cacheSize > 0 ? " · \(formattedBytes(cacheSize))" : ""
+        if cached == 0 {
+            Text("No surahs downloaded")
+                .font(.caption)
+                .foregroundStyle(.orange)
+        } else if cached == 114 {
+            Text("Complete\(sizeLabel)")
+                .font(.caption)
+                .foregroundStyle(.green)
+        } else {
+            Text("\(cached)/114 surahs\(sizeLabel)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 
     // MARK: - Build sources
@@ -291,6 +330,15 @@ struct ReciterDetailView: View {
     private func deleteCDNSource(_ source: ReciterCDNSource) {
         reciter.cdnSources = (reciter.cdnSources ?? []).filter { $0.id != source.id }
         context.delete(source)
+
+        // Clear cached audio for this reciter
+        Task {
+            try? await AudioFileCache.shared.deleteCache(for: reciter)
+            cacheSize = 0
+        }
+        reciter.downloadedSurahsJSON = nil
+        reciter.isDownloaded = false
+
         // If the reciter is now an orphan (no CDN, no personal recordings), delete it and go back
         if (reciter.cdnSources ?? []).isEmpty && !reciter.hasPersonalRecordings {
             if let id = reciter.id {

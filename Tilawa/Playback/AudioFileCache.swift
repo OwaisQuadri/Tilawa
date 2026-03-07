@@ -11,6 +11,12 @@ actor AudioFileCache {
     private var activeDownloads: Set<String> = []       // keys currently in-flight
     private var knownMissing404s: Set<String> = []      // keys that returned HTTP 404 this session
 
+    private let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.httpMaximumConnectionsPerHost = 8
+        return URLSession(configuration: config)
+    }()
+
     // MARK: - URL Construction
 
     /// Returns the local cache URL for an ayah audio file (may not exist yet).
@@ -71,7 +77,7 @@ actor AudioFileCache {
         let destURL = localFileURL(for: ref, reciter: reciter, source: source)
         try ensureCacheDirectoryExists(for: reciter)
 
-        let (tempURL, response) = try await URLSession.shared.download(from: remoteURL)
+        let (tempURL, response) = try await session.download(from: remoteURL)
         // Reject non-200 responses (e.g. 403 rate-limit or 404 returns HTML, not MP3)
         if let http = response as? HTTPURLResponse, http.statusCode != 200 {
             try? fileManager.removeItem(at: tempURL)
@@ -87,7 +93,8 @@ actor AudioFileCache {
 
     // MARK: - Surah Batch Download
 
-    /// Downloads all ayaat in a surah concurrently (max 6 parallel tasks).
+    /// Downloads all ayaat in a surah concurrently.
+    /// Concurrency is managed by the URLSession connection pool (8 per host).
     /// Reports progress via the `progress` closure (0.0–1.0).
     func downloadSurah(_ surah: Int,
                        reciter: Reciter,
@@ -107,31 +114,19 @@ actor AudioFileCache {
 
         try ensureCacheDirectoryExists(for: reciter)
 
-        var completed = 0
         let total = refs.count
+        let completed = ProgressCounter()
 
-        // Use non-throwing group so individual 404s don't abort the whole surah download.
         await withTaskGroup(of: Void.self) { group in
-            var inflight = 0
             for ref in refs {
-                // Limit concurrency to 6
-                if inflight >= 6 {
-                    await group.next()
-                    completed += 1
-                    progress?(Double(completed) / Double(total))
-                    inflight -= 1
-                }
                 group.addTask { [weak self] in
                     guard let self else { return }
                     try? await self.download(ref: ref, reciter: reciter, source: source)
+                    let n = await completed.increment()
+                    progress?(Double(n) / Double(total))
                 }
-                inflight += 1
             }
-            // Drain remaining
-            for await _ in group {
-                completed += 1
-                progress?(Double(completed) / Double(total))
-            }
+            await group.waitForAll()
         }
     }
 
@@ -156,6 +151,41 @@ actor AudioFileCache {
             total += Int64(size)
         }
         return total
+    }
+
+    /// Returns total bytes across all reciter cache directories.
+    func totalCacheSize() -> Int64 {
+        let baseDir = cachesBaseURL()
+        guard let enumerator = fileManager.enumerator(at: baseDir,
+                                                       includingPropertiesForKeys: [.fileSizeKey],
+                                                       options: .skipsHiddenFiles) else { return 0 }
+        var total: Int64 = 0
+        for case let url as URL in enumerator {
+            let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+            total += Int64(size)
+        }
+        return total
+    }
+
+    /// Deletes all cached audio files across all reciters.
+    func deleteAllCache() throws {
+        let baseDir = cachesBaseURL()
+        guard fileManager.fileExists(atPath: baseDir.path) else { return }
+        try fileManager.removeItem(at: baseDir)
+    }
+
+    /// Deletes all cached ayah files for a specific surah.
+    func deleteSurahCache(surah: Int, reciter: Reciter, source: ReciterCDNSource) throws {
+        let metadata = QuranMetadataService.shared
+        let count = metadata.ayahCount(surah: surah)
+        guard count > 0 else { return }
+        for ayah in 1...count {
+            let ref = AyahRef(surah: surah, ayah: ayah)
+            let url = localFileURL(for: ref, reciter: reciter, source: source)
+            if fileManager.fileExists(atPath: url.path) {
+                try fileManager.removeItem(at: url)
+            }
+        }
     }
 
     // MARK: - Audio Duration
@@ -235,5 +265,15 @@ actor AudioFileCache {
             try fileManager.createDirectory(at: dir,
                                             withIntermediateDirectories: true)
         }
+    }
+}
+
+// MARK: - Thread-safe progress counter
+
+private actor ProgressCounter {
+    private var count = 0
+    func increment() -> Int {
+        count += 1
+        return count
     }
 }

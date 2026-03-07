@@ -9,6 +9,10 @@ struct SettingsView: View {
     @Query private var allPlaybackSettings: [PlaybackSettings]
     @Query private var allReciters: [Reciter]
 
+    @State private var totalCacheBytes: Int64 = 0
+    @State private var isLoadingStorage = false
+    @State private var showClearAllConfirmation = false
+
     private var activeSettings: PlaybackSettings? { allPlaybackSettings.first }
 
     var body: some View {
@@ -49,7 +53,37 @@ struct SettingsView: View {
                         Text("Sepia").tag(MushafTheme.sepia)
                     }
                 }
+
+                // MARK: - Storage
+                Section {
+                    Button(role: .destructive) {
+                        showClearAllConfirmation = true
+                    } label: {
+                        if isLoadingStorage {
+                            HStack {
+                                Text("Clear Cache")
+                                Spacer()
+                                ProgressView()
+                                    .controlSize(.small)
+                            }
+                        } else {
+                            Text("Clear Cache (\(formattedBytes(totalCacheBytes)))")
+                        }
+                    }
+                    .disabled(totalCacheBytes == 0)
+                } footer: {
+                    Text("Removes cached CDN audio. Does not affect personal recordings.")
+                        .font(.caption)
+                }
+                .confirmationDialog("Clear All Cache?", isPresented: $showClearAllConfirmation) {
+                    Button("Delete All Cached Audio", role: .destructive) {
+                        Task { await clearAllCache() }
+                    }
+                } message: {
+                    Text("This will delete \(formattedBytes(totalCacheBytes)) of cached audio. Files can be re-downloaded.")
+                }
             }
+            .task { await loadStorageInfo() }
             .navigationTitle("Settings")
         }
     }
@@ -86,5 +120,30 @@ struct SettingsView: View {
 
     private func saveContext() {
         try? context.save()
+    }
+
+    // MARK: - Storage helpers
+
+    private func loadStorageInfo() async {
+        isLoadingStorage = true
+        totalCacheBytes = await AudioFileCache.shared.totalCacheSize()
+        isLoadingStorage = false
+    }
+
+    private func clearAllCache() async {
+        let cache = AudioFileCache.shared
+        try? await cache.deleteAllCache()
+        for reciter in allReciters where reciter.hasCDN {
+            reciter.downloadedSurahsJSON = nil
+            reciter.isDownloaded = false
+        }
+        saveContext()
+        await loadStorageInfo()
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
