@@ -26,7 +26,8 @@ final class ReciterResolver {
     }
 
     func resolve(ref: AyahRef,
-                 snapshot: PlaybackSettingsSnapshot) async -> AyahAudioItem? {
+                 snapshot: PlaybackSettingsSnapshot,
+                 rangeBound: AyahRef? = nil) async -> AyahAudioItem? {
         let matchingOverride = snapshot.segmentOverrides.first { $0.range.contains(ref) }
         let priorityList = matchingOverride.map(\.reciterPriority) ?? snapshot.reciterPriority
 
@@ -68,13 +69,15 @@ final class ReciterResolver {
             for (rank, seg) in sortedSegments.enumerated() {
                 let isExact = seg.safeRiwayah == snapshot.riwayah
                 guard compatibles.contains(seg.safeRiwayah) else { continue }
+                // Skip multi-ayah segments whose end extends past the playback range.
+                let segEnd = AyahRef(surah: seg.endSurahNumber ?? ref.surah,
+                                     ayah:  seg.endAyahNumber  ?? ref.ayah)
+                if let bound = rangeBound, segEnd > bound { continue }
                 // For compatible (non-exact) segments, verify compatibility holds for every ayah
                 // in the segment range — the engine plays the segment audio across the full range.
                 if !isExact {
                     let segStart = AyahRef(surah: seg.surahNumber    ?? ref.surah,
                                            ayah:  seg.ayahNumber     ?? ref.ayah)
-                    let segEnd   = AyahRef(surah: seg.endSurahNumber ?? ref.surah,
-                                           ayah:  seg.endAyahNumber  ?? ref.ayah)
                     guard isCompatibleAcrossRange(segRiwayah: seg.safeRiwayah,
                                                   targetRiwayah: snapshot.riwayah,
                                                   from: segStart, to: segEnd) else { continue }
