@@ -119,11 +119,12 @@ final class MushafViewModel {
 
     func jumpTo(surah: Int, ayah: Int) {
         let ref = AyahRef(surah: surah, ayah: ayah)
-        let page = metadata.page(for: ref)
-        currentPage = page
         highlightedAyah = ref
         highlightedWord = nil
+        highlightedAyahPage = nil
         showJumpSheet = false
+        currentPage = metadata.page(for: ref)  // immediate best-guess
+        scrollToAyah(ref)                       // async exact correction
     }
 
     func jumpToPage(_ page: Int) {
@@ -158,6 +159,7 @@ final class MushafViewModel {
                     let lastKey  = RubService.ayahKey(last)
                     if ayahKey >= firstKey && ayahKey <= lastKey {
                         await MainActor.run {
+                            self.highlightedAyahPage = candidate
                             if candidate != self.currentPage { self.currentPage = candidate }
                         }
                         return
