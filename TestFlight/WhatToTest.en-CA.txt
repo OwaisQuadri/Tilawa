@@ -1,36 +1,8 @@
-## Navigation & Jump Sheet UX
+## CDN UI & Storage
 
-### B1: Accurate Page Jump
-- Open the Jump Sheet (tap page number)
-- Navigate to Position tab
-- Select a surah like Al-Kahf (18) and ayah 1
-- Tap "Go"
-- Verify the app lands on the exact page where Surah 18:1 appears (should be precise, not ±1-2 pages off)
-- Test with multiple surahs (especially those with variable page boundaries)
-
-### B2: Bookmarks & Recents Tabs
-- **Bookmarks**: Long-press any ayah, tap "Bookmark Ayah"
-  - Open Jump Sheet → Bookmarks tab
-  - Verify the bookmarked ayah appears with its label and surah/ayah reference
-  - Try the three sort options: Newest, Oldest, Position
-  - Swipe left on a bookmark to delete it
-  - Tap a bookmark to jump to that ayah
-- **Recents**: Open Jump Sheet → Recents tab
-  - Verify it shows a combined list of recent jumps (from using the jump sheet) and listening sessions
-  - Each entry shows a jump icon or headphones icon to distinguish the type
-  - Tap any entry to jump to that ayah
-- **Bookmark Toggle**: Long-press an already-bookmarked ayah
-  - Verify the alert shows "Remove Bookmark" (destructive role) instead of "Bookmark Ayah"
-  - Tap to remove the bookmark, then re-bookmark to verify toggle works
-
-### B3: Fuzzy Search in Jump Sheet
-- Open Jump Sheet and tap the search bar
-- Test patterns:
-  - "10:10" or "10 10" → should show Surah 10:10
-  - "p 300" or "page 300" → should show Page 300
-  - "j 5" or "juz 5" → should show Juz 5
-  - "100" (bare number) → should show Page 100, Surah 100:1, and all surahs with ayah 100
-  - "yunus" or "kahf" → fuzzy match on surah names, tap to jump
-- Verify search results appear as a list
-- Tap any result to jump to that location
-- Clear the search box to return to normal tab view
+- Reciters tab rows should show only name, riwayah label, and source icons (no progress bars or badges)
+- Tap a CDN reciter — the CDN source row should display a coverage badge with cache size (e.g. "45/114 surahs · 1.2 GB")
+- Start a surah download, return to the detail view — the CDN row should show a progress bar with status text
+- After download completes, the badge should update with the new surah count and cache size
+- Swipe-delete a CDN source — cached audio should be automatically cleaned up
+- Settings → Storage section shows "Clear Cache (X MB)" — tap to clear all cached CDN audio

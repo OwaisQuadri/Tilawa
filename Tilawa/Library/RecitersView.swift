@@ -7,8 +7,6 @@ struct RecitersView: View {
     @Query private var allReciters: [Reciter]
     @State private var isShowingManifestSheet = false
 
-    private let dm = DownloadManager.shared
-
     private var allKnownReciters: [Reciter] {
         allReciters
             .filter { $0.hasCDN || $0.hasPersonalRecordings }
@@ -45,9 +43,6 @@ struct RecitersView: View {
 
     @ViewBuilder
     private func reciterRow(_ reciter: Reciter) -> some View {
-        let cached = reciter.downloadedSurahs.count
-        let activeJob = dm.activeJob(for: reciter.id ?? UUID())
-
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 3) {
                 Text(reciter.safeName)
@@ -69,36 +64,8 @@ struct RecitersView: View {
                     .foregroundStyle(.secondary)
                     .labelStyle(.iconOnly)
                 }
-                if reciter.hasCDN {
-                    if let job = activeJob {
-                        ProgressView(value: job.overall)
-                            .controlSize(.mini)
-                        Text(job.statusText)
-                            .font(.caption2)
-                            .foregroundStyle(.secondary)
-                    } else {
-                        coverageBadge(cached: cached)
-                    }
-                }
             }
             Spacer()
-        }
-    }
-
-    @ViewBuilder
-    private func coverageBadge(cached: Int) -> some View {
-        if cached == 0 {
-            Text("No surahs downloaded")
-                .font(.caption)
-                .foregroundStyle(.orange)
-        } else if cached == 114 {
-            Label("Complete", systemImage: "checkmark.seal.fill")
-                .font(.caption)
-                .foregroundStyle(.green)
-        } else {
-            Text("\(cached)/114 surahs")
-                .font(.caption)
-                .foregroundStyle(.secondary)
         }
     }
 

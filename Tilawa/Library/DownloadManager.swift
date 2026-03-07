@@ -82,20 +82,10 @@ final class DownloadManager {
             let cache = AudioFileCache.shared
             let metadata = QuranMetadataService.shared
 
-            // Up to 4 surahs concurrently. Each surah itself downloads its ayaat in parallel
-            // (AudioFileCache.downloadSurah already caps at 6 ayaat concurrently).
-            // Note: child tasks capture `reciter` (@Model). Safe in Swift 5 mode since
-            // the object is read-only during downloads.
+            // All surahs launch concurrently. Actual HTTP concurrency is managed
+            // by AudioFileCache's URLSession connection pool (8 per host).
             await withTaskGroup(of: (Int, Bool).self) { group in
-                var inFlight = 0
                 for surah in surahs {
-                    // Throttle to 4 concurrent surah tasks
-                    while inFlight >= 4 {
-                        if let (done, ok) = await group.next() {
-                            inFlight -= 1
-                            applyResult(jobId: jobId, surah: done, success: ok)
-                        }
-                    }
                     let s = surah
                     group.addTask {
                         guard let src = resolvedSource else { return (s, false) }
@@ -110,7 +100,6 @@ final class DownloadManager {
                             return (s, false)
                         }
                     }
-                    inFlight += 1
                 }
                 for await (done, ok) in group {
                     applyResult(jobId: jobId, surah: done, success: ok)
