@@ -1,11 +1,13 @@
-## Import from URL Feature
+## Playback Engine Bugfixes
 
-- Tap Library > Import > "Import from URL"
-- Paste a direct audio file URL (e.g., an MP3 from a CDN). Verify the URL validates (green checkmark), tap Import, and the file downloads with progress indicator
-- Test with a large file (>5MB) to verify chunked download works correctly
-- Test with a video file URL (e.g., MP4). Verify the audio is extracted and saved as M4A
-- Test with an archive.org /details/ URL (e.g., https://archive.org/details/IDENTIFIER/filename.mp3). Verify it auto-converts to /download/ and imports correctly
-- Test with an invalid URL (missing http/https). Verify the Import button stays disabled and footer shows red X
-- Test with a URL that returns an HTML page instead of audio. Verify it fails with error "The URL returned a web page instead of an audio or video file"
-- After successful import, tap the recording to verify title, duration, and file format are correctly populated
-- Test cancellation: initiate a URL import, wait for download to start, tap the stop button. Verify the row disappears and the recording is not saved
+### A1: Range Playback — Multi-ayah segments
+- Select a range like 1:2-6
+- If a personal recording spans beyond the range (e.g., 1:6-7), verify it stops at ayah 6 (does not play into ayah 7)
+- For ayah 6, the app should fall back to CDN audio instead of using the overshooting segment
+- Test with multiple personal recordings at different boundaries
+
+### A2: Range Repeat Counter
+- In Settings, set: Ayah Repeat = 1 (no repeats), Range Repeat = 1, Behavior = "After repeating ayahs"
+- Start playback of a range
+- Verify the counter shows "Range 1/1" (not "Range 1/2")
+- Test with different range repeat counts (2, 3, etc.) to verify the label updates correctly
