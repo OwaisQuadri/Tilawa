@@ -88,11 +88,13 @@ final class PlaybackEngine {
         activeSnapshot = settings
         totalAyahRepetitions = settings.ayahRepeatCount
         // For .afterRepeatingAyahs: total passes = 1 (with repeats) + rangeRepeatCount (plain)
-        totalRangeRepetitions = (settings.rangeRepeatCount != -1 && settings.rangeRepeatBehavior == .afterRepeatingAyahs)
+        totalRangeRepetitions = (settings.rangeRepeatCount != -1
+            && settings.ayahRepeatCount > 1
+            && settings.rangeRepeatBehavior == .afterRepeatingAyahs)
             ? settings.rangeRepeatCount + 1
             : settings.rangeRepeatCount
         currentRangeRepetition = 1
-        isInPlainRangePass = false
+        isInPlainRangePass = settings.ayahRepeatCount <= 1
         ayahQueue = PlaybackQueue.build(range: range, settings: settings, metadata: metadata)
         currentQueueIndex = 0
         print("▶️ PlaybackEngine.play: queue=\(ayahQueue.count) ayaat, reciters=\(settings.reciterPriority.count), riwayah=\(settings.riwayah.rawValue), engineRunning=\(audioEngine.isRunning)")
@@ -268,7 +270,8 @@ final class PlaybackEngine {
         }
         print("🔍 scheduleCurrentAyah: \(ref.surah):\(ref.ayah) [\(currentQueueIndex)/\(ayahQueue.count-1)]")
 
-        guard let item = await resolver.resolve(ref: ref, snapshot: snapshot) else {
+        guard let item = await resolver.resolve(ref: ref, snapshot: snapshot,
+                                                rangeBound: activeSnapshot?.range.end) else {
             // Guard against stale session after the async resolve
             guard sessionID == capturedSession else { return }
             print("❌ No audio for \(ref.surah):\(ref.ayah)")
