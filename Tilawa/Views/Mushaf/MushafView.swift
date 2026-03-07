@@ -1,10 +1,13 @@
 import SwiftUI
+import SwiftData
 
 /// The main Mushaf reading view with horizontal page swiping.
 struct MushafView: View {
     @Environment(MushafViewModel.self) private var mushafVM
     @Environment(PlaybackViewModel.self) private var playbackVM
 
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allBookmarks: [UserBookmark]
     @State private var showPlaybackSetup = false
 
     var body: some View {
@@ -68,6 +71,26 @@ struct MushafView: View {
             }
             .alert(vm.longPressedAyahTitle, isPresented: $vm.showAyahContextMenu) {
                 Button("Play Ayah") { showPlaybackSetup = true }
+                if let ref = vm.longPressedAyahRef,
+                   let existing = allBookmarks.first(where: {
+                       $0.surah == ref.surah && $0.ayah == ref.ayah
+                   }) {
+                    Button("Remove Bookmark", role: .destructive) {
+                        modelContext.delete(existing)
+                    }
+                } else {
+                    Button("Bookmark Ayah") {
+                        if let ref = vm.longPressedAyahRef {
+                            let bookmark = UserBookmark(
+                                surah: ref.surah,
+                                ayah: ref.ayah,
+                                page: vm.metadata.page(for: ref),
+                                label: vm.longPressedAyahTitle
+                            )
+                            modelContext.insert(bookmark)
+                        }
+                    }
+                }
                 Button("Cancel", role: .cancel) {}
             }
         }

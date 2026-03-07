@@ -1,13 +1,36 @@
-## Playback Engine Bugfixes
+## Navigation & Jump Sheet UX
 
-### A1: Range Playback — Multi-ayah segments
-- Select a range like 1:2-6
-- If a personal recording spans beyond the range (e.g., 1:6-7), verify it stops at ayah 6 (does not play into ayah 7)
-- For ayah 6, the app should fall back to CDN audio instead of using the overshooting segment
-- Test with multiple personal recordings at different boundaries
+### B1: Accurate Page Jump
+- Open the Jump Sheet (tap page number)
+- Navigate to Position tab
+- Select a surah like Al-Kahf (18) and ayah 1
+- Tap "Go"
+- Verify the app lands on the exact page where Surah 18:1 appears (should be precise, not ±1-2 pages off)
+- Test with multiple surahs (especially those with variable page boundaries)
 
-### A2: Range Repeat Counter
-- In Settings, set: Ayah Repeat = 1 (no repeats), Range Repeat = 1, Behavior = "After repeating ayahs"
-- Start playback of a range
-- Verify the counter shows "Range 1/1" (not "Range 1/2")
-- Test with different range repeat counts (2, 3, etc.) to verify the label updates correctly
+### B2: Bookmarks & Recents Tabs
+- **Bookmarks**: Long-press any ayah, tap "Bookmark Ayah"
+  - Open Jump Sheet → Bookmarks tab
+  - Verify the bookmarked ayah appears with its label and surah/ayah reference
+  - Try the three sort options: Newest, Oldest, Position
+  - Swipe left on a bookmark to delete it
+  - Tap a bookmark to jump to that ayah
+- **Recents**: Open Jump Sheet → Recents tab
+  - Verify it shows a combined list of recent jumps (from using the jump sheet) and listening sessions
+  - Each entry shows a jump icon or headphones icon to distinguish the type
+  - Tap any entry to jump to that ayah
+- **Bookmark Toggle**: Long-press an already-bookmarked ayah
+  - Verify the alert shows "Remove Bookmark" (destructive role) instead of "Bookmark Ayah"
+  - Tap to remove the bookmark, then re-bookmark to verify toggle works
+
+### B3: Fuzzy Search in Jump Sheet
+- Open Jump Sheet and tap the search bar
+- Test patterns:
+  - "10:10" or "10 10" → should show Surah 10:10
+  - "p 300" or "page 300" → should show Page 300
+  - "j 5" or "juz 5" → should show Juz 5
+  - "100" (bare number) → should show Page 100, Surah 100:1, and all surahs with ayah 100
+  - "yunus" or "kahf" → fuzzy match on surah names, tap to jump
+- Verify search results appear as a list
+- Tap any result to jump to that location
+- Clear the search box to return to normal tab view

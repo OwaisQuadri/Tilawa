@@ -23,7 +23,7 @@ struct TilawaApp: App {
                 PlaybackSettings.self, ReciterPriorityEntry.self, ReciterSegmentOverride.self,
                 SegmentReciterEntry.self, Reciter.self, ReciterCDNSource.self,
                 Recording.self, RecordingSegment.self, AyahMarker.self,
-                UserBookmark.self, ListeningSession.self
+                UserBookmark.self, ListeningSession.self, JumpHistory.self
             ]), configurations: modelConfiguration)
         } catch {
             fatalError("Could not create ModelContainer: \(error)")

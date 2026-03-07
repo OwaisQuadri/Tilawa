@@ -115,4 +115,31 @@ final class QuranMetadataService: Sendable {
     var totalAyahCount: Int {
         surahs.reduce(0) { $0 + $1.ayahCount }
     }
+
+    /// Fuzzy search for surahs by English or Arabic name.
+    /// Strips common prefixes ("al-", "al ") and does case-insensitive contains matching.
+    func searchSurahs(_ query: String) -> [SurahInfo] {
+        let cleaned = query.trimmingCharacters(in: .whitespaces).lowercased()
+        guard !cleaned.isEmpty else { return [] }
+
+        let stripped: String
+        if cleaned.hasPrefix("al-") {
+            stripped = String(cleaned.dropFirst(3))
+        } else if cleaned.hasPrefix("al ") {
+            stripped = String(cleaned.dropFirst(3))
+        } else {
+            stripped = cleaned
+        }
+
+        return surahs.filter { surah in
+            let englishLower = surah.englishName.lowercased()
+            let englishStripped = englishLower.hasPrefix("al-")
+                ? String(englishLower.dropFirst(3))
+                : englishLower
+
+            return englishLower.contains(cleaned)
+                || englishStripped.contains(stripped)
+                || surah.name.contains(query.trimmingCharacters(in: .whitespaces))
+        }
+    }
 }
