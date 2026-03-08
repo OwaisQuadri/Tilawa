@@ -1,4 +1,5 @@
 import SwiftData
+import SwiftUI
 import Foundation
 
 /// Temporary annotation marker placed on the waveform during editing.
@@ -18,6 +19,24 @@ final class AyahMarker {
     var endPositionSeconds: Double?  // explicit end time; if nil, next marker's start is used
     var reciterID: UUID?             // reciter to assign to the segment opening at this marker
     var riwayah: String?             // Riwayah.rawValue — riwayah for the segment opening at this marker
+    var markerType: String?          // "ayah" | "cropAfter" | "cropBefore"; nil = "ayah"
+
+    enum MarkerType: String, CaseIterable {
+        case ayah = "ayah"
+        case cropAfter = "cropAfter"
+        case cropBefore = "cropBefore"
+    }
+
+    var resolvedMarkerType: MarkerType {
+        MarkerType(rawValue: markerType ?? "") ?? .ayah
+    }
+
+    var displayColor: Color {
+        switch resolvedMarkerType {
+        case .cropAfter, .cropBefore: return .purple
+        case .ayah: return (isConfirmed == true) ? .green : .orange
+        }
+    }
 
     // MARK: - Nil initializer (required for CloudKit)
     init() {
@@ -30,6 +49,7 @@ final class AyahMarker {
         self.endPositionSeconds = nil
         self.reciterID = nil
         self.riwayah = nil
+        self.markerType = nil
     }
 
     // MARK: - Convenience initializer

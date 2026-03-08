@@ -9,11 +9,13 @@ struct AyahAssignmentView: View {
     /// The start ayah of the previous confirmed marker, used to seed smart defaults.
     let suggestedRef: AyahRef?
     let onAssign: (AyahRef?, AyahRef?) -> Void
+    var onMarkerTypeChanged: ((AyahMarker.MarkerType) -> Void)?
     let onDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
     @Query(sort: \Reciter.name) private var allReciters: [Reciter]
 
+    @State private var selectedMarkerType: AyahMarker.MarkerType
     @State private var selectedSurah: Int?
     @State private var selectedAyah: Int?
     @State private var selectedEndSurah: Int?
@@ -25,11 +27,14 @@ struct AyahAssignmentView: View {
     init(marker: AyahMarker,
          suggestedRef: AyahRef? = nil,
          onAssign: @escaping (AyahRef?, AyahRef?) -> Void,
+         onMarkerTypeChanged: ((AyahMarker.MarkerType) -> Void)? = nil,
          onDelete: @escaping () -> Void) {
         self.marker = marker
         self.suggestedRef = suggestedRef
         self.onAssign = onAssign
+        self.onMarkerTypeChanged = onMarkerTypeChanged
         self.onDelete = onDelete
+        _selectedMarkerType = State(initialValue: marker.resolvedMarkerType)
         _selectedSurah      = State(initialValue: marker.assignedSurah)
         _selectedAyah       = State(initialValue: marker.assignedAyah)
         _selectedEndSurah   = State(initialValue: marker.assignedEndSurah)
@@ -40,7 +45,8 @@ struct AyahAssignmentView: View {
 
     private var startAyahSelected: Bool { selectedSurah != nil && selectedAyah != nil }
     private var confirmDisabled: Bool {
-        startAyahSelected && (selectedReciterID == nil || selectedRiwayah == nil)
+        guard selectedMarkerType == .ayah else { return false }
+        return startAyahSelected && (selectedReciterID == nil || selectedRiwayah == nil)
     }
 
     // Default for "ending at marker" picker:
@@ -76,62 +82,73 @@ struct AyahAssignmentView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section {
-                    NavigationLink {
-                        let d = endPickerDefault()
-                        AyahPickerDetailView(
-                            title: "Ayah ending at marker",
-                            surah: $selectedEndSurah,
-                            ayah: $selectedEndAyah,
-                            defaultSurah: d.surah,
-                            defaultAyah: d.ayah
-                        )
-                    } label: {
-                        LabeledContent("Ayah Ending at Marker") {
-                            Text(ayahLabel(surah: selectedEndSurah, ayah: selectedEndAyah))
-                                .foregroundStyle(selectedEndSurah == nil ? .tertiary : .secondary)
-                        }
+                Section("Marker Type") {
+                    Picker("Type", selection: $selectedMarkerType) {
+                        Text("Ayah").tag(AyahMarker.MarkerType.ayah)
+                        Text("Crop After").tag(AyahMarker.MarkerType.cropAfter)
+                        Text("Crop Before").tag(AyahMarker.MarkerType.cropBefore)
                     }
+                    .pickerStyle(.segmented)
                 }
 
-                Section {
-                    NavigationLink {
-                        let d = startPickerDefault()
-                        AyahPickerDetailView(
-                            title: "Ayah starting at marker",
-                            surah: $selectedSurah,
-                            ayah: $selectedAyah,
-                            defaultSurah: d.surah,
-                            defaultAyah: d.ayah
-                        )
-                    } label: {
-                        LabeledContent("Ayah Starting at Marker") {
-                            Text(ayahLabel(surah: selectedSurah, ayah: selectedAyah))
-                                .foregroundStyle(selectedSurah == nil ? .tertiary : .secondary)
+                if selectedMarkerType == .ayah {
+                    Section {
+                        NavigationLink {
+                            let d = endPickerDefault()
+                            AyahPickerDetailView(
+                                title: "Ayah ending at marker",
+                                surah: $selectedEndSurah,
+                                ayah: $selectedEndAyah,
+                                defaultSurah: d.surah,
+                                defaultAyah: d.ayah
+                            )
+                        } label: {
+                            LabeledContent("Ayah Ending at Marker") {
+                                Text(ayahLabel(surah: selectedEndSurah, ayah: selectedEndAyah))
+                                    .foregroundStyle(selectedEndSurah == nil ? .tertiary : .secondary)
+                            }
                         }
                     }
 
-                    if startAyahSelected {
-                        let reciterName = allReciters.first(where: { $0.id == selectedReciterID })?.safeName
+                    Section {
                         NavigationLink {
-                            ReciterPickerView(selectedID: selectedReciterID) { id in
-                                selectedReciterID = id
-                            }
+                            let d = startPickerDefault()
+                            AyahPickerDetailView(
+                                title: "Ayah starting at marker",
+                                surah: $selectedSurah,
+                                ayah: $selectedAyah,
+                                defaultSurah: d.surah,
+                                defaultAyah: d.ayah
+                            )
                         } label: {
-                            LabeledContent("Reciter") {
-                                Text(reciterName ?? "")
-                                    .foregroundStyle(.secondary)
+                            LabeledContent("Ayah Starting at Marker") {
+                                Text(ayahLabel(surah: selectedSurah, ayah: selectedAyah))
+                                    .foregroundStyle(selectedSurah == nil ? .tertiary : .secondary)
                             }
                         }
 
-                        NavigationLink {
-                            RiwayahPickerView(selectedRiwayah: selectedRiwayah) { riwayah in
-                                selectedRiwayah = riwayah
+                        if startAyahSelected {
+                            let reciterName = allReciters.first(where: { $0.id == selectedReciterID })?.safeName
+                            NavigationLink {
+                                ReciterPickerView(selectedID: selectedReciterID) { id in
+                                    selectedReciterID = id
+                                }
+                            } label: {
+                                LabeledContent("Reciter") {
+                                    Text(reciterName ?? "")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
-                        } label: {
-                            LabeledContent("Riwayah") {
-                                Text(selectedRiwayah?.displayName ?? "")
-                                    .foregroundStyle(.secondary)
+
+                            NavigationLink {
+                                RiwayahPickerView(selectedRiwayah: selectedRiwayah) { riwayah in
+                                    selectedRiwayah = riwayah
+                                }
+                            } label: {
+                                LabeledContent("Riwayah") {
+                                    Text(selectedRiwayah?.displayName ?? "")
+                                        .foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
@@ -162,15 +179,25 @@ struct AyahAssignmentView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Confirm") {
-                        let startRef = selectedSurah.flatMap { s in
-                            selectedAyah.map { a in AyahRef(surah: s, ayah: a) }
+                        onMarkerTypeChanged?(selectedMarkerType)
+                        if selectedMarkerType == .ayah {
+                            let startRef = selectedSurah.flatMap { s in
+                                selectedAyah.map { a in AyahRef(surah: s, ayah: a) }
+                            }
+                            let endRef = selectedEndSurah.flatMap { s in
+                                selectedEndAyah.map { a in AyahRef(surah: s, ayah: a) }
+                            }
+                            marker.reciterID = selectedReciterID
+                            marker.riwayah   = selectedRiwayah?.rawValue
+                            onAssign(startRef, endRef)
+                        } else {
+                            // Crop markers: clear ayah assignments, mark confirmed
+                            marker.assignedSurah = nil
+                            marker.assignedAyah = nil
+                            marker.assignedEndSurah = nil
+                            marker.assignedEndAyah = nil
+                            marker.isConfirmed = true
                         }
-                        let endRef = selectedEndSurah.flatMap { s in
-                            selectedEndAyah.map { a in AyahRef(surah: s, ayah: a) }
-                        }
-                        marker.reciterID = selectedReciterID
-                        marker.riwayah   = selectedRiwayah?.rawValue
-                        onAssign(startRef, endRef)
                         dismiss()
                     }
                     .fontWeight(.semibold)
