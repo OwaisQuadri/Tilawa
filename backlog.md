@@ -85,3 +85,33 @@ only the marked ayah segments with no silence or unrecited audio between them.
 
 **Scope**: Moderate — requires changes to the finalize/export pipeline to compose
 multiple time ranges into a single output file.
+
+---
+
+## 5. Reciter CDN Import Rework + Admin Review System
+
+**Problem**
+Currently, importing a CDN source requires manually entering a URL or manifest.
+There is no way to discover available reciters, and no moderation system for
+user-uploaded CDN sources.
+
+**What's needed**
+
+### Discovery & Import
+- A searchable list of reciter presets when importing a CDN source
+- Fuzzy search by reciter name and riwayah
+- Preset list is the union of: (a) hardcoded presets bundled in the app, and
+  (b) a dynamic list hosted on the CDN (e.g. `manifests/index.json`)
+- Selecting a preset auto-fills the CDN source config (base URL, format,
+  naming pattern, riwayah)
+
+### Admin Review System
+- An admin mode (hidden or gated) for reviewing user-uploaded CDN sources
+- A review queue listing CDN sources pending approval
+- Each item in the queue can be: put in review, rejected, or accepted
+- Accepted CDN sources are added to the public-facing preset list on the CDN
+- Rejected sources are flagged and not listed
+
+**Scope**: Large — requires Worker API changes (listing endpoint, review
+endpoints), app UI for preset search, admin UI for the review queue, and a
+decision on how admin auth works (separate API key, device-based, etc.).
