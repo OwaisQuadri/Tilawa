@@ -1,12 +1,12 @@
-## Annotation Editor Redesign
+## CDN Download & Cache Management
 
-- Open a recording and tap Edit — the editor should fill the full screen with a waveform at the top
-- The bottom toolbar has 6 buttons: Auto (sparkles), Undo, Redo, Play/Pause, Cut (scissors), and Add Marker (plus.circle)
-- Add a marker, tap the pencil icon at the top — a sheet opens to assign ayah or marker type (Ayah/Crop After/Crop Before)
-- Enable "Auto" toggle and add markers — they should auto-assign types: after CropAfter comes CropBefore, after CropBefore comes Ayah
-- Place CropAfter and CropBefore markers — purple shading appears between them on the waveform indicating the crop region
-- Tap the Cut button with a crop region active — the audio is immediately cut, a "Cropping selections…" spinner appears, the Cut operation can be undone
-- Tap Undo/Redo — the cut is reversed or reapplied; waveform and markers update
-- Assign two markers with only start ayahs and a gap between them, then tap Finalize — an alert warns that this is irreversible and will remove the gap
-- Tap Finalize — segments are kept, gaps (like rakaah breaks) are removed, file size is reduced, markers are adjusted to new positions
-- Pinch horizontally on the waveform — zoom in/out; drag the waveform to scrub; playback follows the cursor or resumes from scrub position
+- Navigate to a reciter with CDN sources → tap Manage CDN (renamed from "Download Surahs")
+- Verify surahs show per-surah progress bars while downloading, green checkmarks when done
+- Tap menu (ellipsis) → "Download All" downloads all uncached surahs in background
+- Navigate away and back to Manage CDN — download progress persists and updates
+- Tap menu → "Share CDN" and verify it opens share sheet with CDN URL
+- Download some surahs, then tap menu → "Clear Cache" → confirm deletion removes only that CDN's cached files
+- Verify other reciters' cached CDN files are unaffected by the cache clear
+- Tap "Check for Updates" — availability check runs with progress indicator
+- If uploading a CDN: complete upload, verify new version number increments
+- Disable Wi-Fi, verify "Check for Updates" gracefully handles network errors (no crash)

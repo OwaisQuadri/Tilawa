@@ -2,7 +2,8 @@ import Foundation
 
 /// The 20 canonical riwayaat from the 7 mutawatir qira'at (plus 3 mashhur completing the 10).
 /// Stored as String rawValue in @Model fields for CloudKit compatibility.
-enum Riwayah: String, CaseIterable, Codable {
+enum Riwayah: String, CaseIterable, Codable, Identifiable {
+    var id: String { rawValue }
 
     // ── Asim (عاصم) ────────────────────────────────────────────
     case hafs    = "hafs"     // رواية حفص — most widely used globally

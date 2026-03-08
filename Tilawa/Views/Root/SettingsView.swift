@@ -15,6 +15,12 @@ struct SettingsView: View {
 
     private var activeSettings: PlaybackSettings? { allPlaybackSettings.first }
 
+    private var appVersion: String {
+        let marketing = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
+        return "\(marketing) (\(build))"
+    }
+
     var body: some View {
         @Bindable var vm = mushafVM
 
@@ -82,6 +88,12 @@ struct SettingsView: View {
                 } message: {
                     Text("This will delete \(formattedBytes(totalCacheBytes)) of cached audio. Files can be re-downloaded.")
                 }
+
+                // MARK: - About
+                Section {
+                    LabeledContent("Version", value: appVersion)
+                }
+
             }
             .task { await loadStorageInfo() }
             .navigationTitle("Settings")
@@ -146,4 +158,5 @@ struct SettingsView: View {
         formatter.countStyle = .file
         return formatter.string(fromByteCount: bytes)
     }
+
 }
