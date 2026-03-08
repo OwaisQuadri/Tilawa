@@ -29,6 +29,12 @@ struct RecordingRowView: View {
                             .font(.caption2)
                             .foregroundStyle(.tertiary)
                     }
+
+                    if let bytes = recording.fileSizeBytes, bytes > 0 {
+                        Text(fileSizeLabel(bytes))
+                            .font(.caption2)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
             }
 
@@ -62,6 +68,12 @@ struct RecordingRowView: View {
         let m = secs / 60
         let s = secs % 60
         return String(format: "%d:%02d", m, s)
+    }
+
+    private func fileSizeLabel(_ bytes: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 
     @ViewBuilder

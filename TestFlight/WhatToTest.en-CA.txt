@@ -1,8 +1,12 @@
-## CDN UI & Storage
+## Annotation Editor Redesign
 
-- Reciters tab rows should show only name, riwayah label, and source icons (no progress bars or badges)
-- Tap a CDN reciter — the CDN source row should display a coverage badge with cache size (e.g. "45/114 surahs · 1.2 GB")
-- Start a surah download, return to the detail view — the CDN row should show a progress bar with status text
-- After download completes, the badge should update with the new surah count and cache size
-- Swipe-delete a CDN source — cached audio should be automatically cleaned up
-- Settings → Storage section shows "Clear Cache (X MB)" — tap to clear all cached CDN audio
+- Open a recording and tap Edit — the editor should fill the full screen with a waveform at the top
+- The bottom toolbar has 6 buttons: Auto (sparkles), Undo, Redo, Play/Pause, Cut (scissors), and Add Marker (plus.circle)
+- Add a marker, tap the pencil icon at the top — a sheet opens to assign ayah or marker type (Ayah/Crop After/Crop Before)
+- Enable "Auto" toggle and add markers — they should auto-assign types: after CropAfter comes CropBefore, after CropBefore comes Ayah
+- Place CropAfter and CropBefore markers — purple shading appears between them on the waveform indicating the crop region
+- Tap the Cut button with a crop region active — the audio is immediately cut, a "Cropping selections…" spinner appears, the Cut operation can be undone
+- Tap Undo/Redo — the cut is reversed or reapplied; waveform and markers update
+- Assign two markers with only start ayahs and a gap between them, then tap Finalize — an alert warns that this is irreversible and will remove the gap
+- Tap Finalize — segments are kept, gaps (like rakaah breaks) are removed, file size is reduced, markers are adjusted to new positions
+- Pinch horizontally on the waveform — zoom in/out; drag the waveform to scrub; playback follows the cursor or resumes from scrub position

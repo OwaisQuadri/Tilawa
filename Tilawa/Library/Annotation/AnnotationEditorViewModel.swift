@@ -26,10 +26,40 @@ final class AnnotationEditorViewModel {
     private var positionUpdateTimer: Timer?
     private var segmentEndTime: Double?
 
+    // MARK: - Edit operation state
+
+    var isProcessingEdit = false
+    var processingMessage = "Finalizing…"
+    var editError: Error?
+
+    private let audioEditor = AudioEditingService()
+
+    // MARK: - Undo stack for cuts
+
+    struct CutSnapshot {
+        let backupURL: URL
+        let duration: Double
+        let markerPositions: [(id: UUID, position: Double)]
+    }
+    var undoStack: [CutSnapshot] = []
+    var redoStack: [CutSnapshot] = []
+    var canUndo: Bool { !undoStack.isEmpty }
+    var canRedo: Bool { !redoStack.isEmpty }
+
+    // MARK: - Zoom
+
+    var zoomLevel: CGFloat = 1.0
+    var isZooming = false
+
+    // MARK: - Scroll interaction during playback
+
+    /// When the user drags the waveform during playback, we pause and track that state
+    /// so we can resume from the new position when they release.
+    var wasPausedByScroll = false
+
     // MARK: - Waveform display
 
-    /// Bucket count used for waveform analysis. Enough detail for a scrollable view.
-    private let bucketCount = 1200
+    private let baseBucketCount = 1200
     private let analyzer = WaveformAnalyzer()
 
     init(recording: Recording) {
@@ -48,7 +78,7 @@ final class AnnotationEditorViewModel {
         isLoadingWaveform = true
         waveformError = nil
         do {
-            amplitudes = try await analyzer.analyze(url: url, bucketCount: bucketCount)
+            amplitudes = try await analyzer.analyze(url: url, bucketCount: baseBucketCount)
         } catch {
             waveformError = error
         }
@@ -246,6 +276,7 @@ final class AnnotationEditorViewModel {
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
             previewDuration = audioPlayer?.duration ?? recording.safeDuration
+            previewPosition = seconds
             isPreviewPlaying = true
 
             positionUpdateTimer = Timer.scheduledTimer(withTimeInterval: 0.05, repeats: true) { [weak self] _ in
@@ -319,6 +350,387 @@ final class AnnotationEditorViewModel {
             context.insert(marker)
         }
         try? context.save()
+    }
+
+    // MARK: - Auto marker type
+
+    func autoMarkerType(for markers: [AyahMarker]) -> AyahMarker.MarkerType {
+        guard let lastMarker = markers.last else { return .ayah }
+        switch lastMarker.resolvedMarkerType {
+        case .cropAfter: return .cropBefore
+        case .cropBefore: return .ayah
+        case .ayah: return .ayah
+        }
+    }
+
+    // MARK: - Crop region computation
+
+    /// Computes cropped regions from crop markers. Shared by WaveformView (rendering) and finalize.
+    static func computeCropRegions(from markers: [AyahMarker], totalDuration: Double) -> [(start: Double, end: Double)] {
+        let cropMarkers = markers
+            .filter { $0.resolvedMarkerType != .ayah }
+            .sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
+
+        var regions: [(start: Double, end: Double)] = []
+        var i = 0
+        while i < cropMarkers.count {
+            let m = cropMarkers[i]
+            let pos = m.positionSeconds ?? 0
+            if m.resolvedMarkerType == .cropBefore {
+                regions.append((0, pos))
+                i += 1
+            } else if m.resolvedMarkerType == .cropAfter {
+                if i + 1 < cropMarkers.count, cropMarkers[i + 1].resolvedMarkerType == .cropBefore {
+                    let endPos = cropMarkers[i + 1].positionSeconds ?? totalDuration
+                    regions.append((pos, endPos))
+                    i += 2
+                } else {
+                    regions.append((pos, totalDuration))
+                    i += 1
+                }
+            } else {
+                i += 1
+            }
+        }
+        return regions
+    }
+
+
+    // MARK: - Cut crop region (immediate)
+
+    /// Cuts the first crop region from the audio file immediately.
+    /// Backs up state for undo, remaps all marker positions, deletes the crop markers that defined the region.
+    func cutCropRegion(markers: [AyahMarker], context: ModelContext) async throws {
+        guard let path = recording.storagePath else { return }
+        let url = AudioImporter.recordingsDirectory.appendingPathComponent(path)
+
+        let totalDuration = recording.safeDuration
+        let cropRegions = Self.computeCropRegions(from: markers, totalDuration: totalDuration)
+        guard let region = cropRegions.first else { return }
+
+        isProcessingEdit = true
+        processingMessage = "Cropping selections…"
+        defer { isProcessingEdit = false }
+
+        stopPreview()
+
+        // Save backup for undo
+        let backupURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("undo_\(UUID().uuidString).m4a")
+        try FileManager.default.copyItem(at: url, to: backupURL)
+
+        let allMarkers = sortedMarkers(in: context)
+        let snapshot = CutSnapshot(
+            backupURL: backupURL,
+            duration: totalDuration,
+            markerPositions: allMarkers.compactMap { m in
+                guard let id = m.id, let pos = m.positionSeconds else { return nil }
+                return (id, pos)
+            }
+        )
+        undoStack.append(snapshot)
+
+        // Clear redo stack — new action invalidates redo history
+        for redo in redoStack { try? FileManager.default.removeItem(at: redo.backupURL) }
+        redoStack.removeAll()
+
+        // Delete the region from the audio file
+        let newDuration = try await audioEditor.deleteRegion(
+            fileURL: url, start: region.start, end: region.end
+        )
+
+        // Update storagePath if format changed (e.g., original was .caf)
+        let newFilename = URL(fileURLWithPath: path).deletingPathExtension()
+            .appendingPathExtension("m4a").lastPathComponent
+        if recording.storagePath != newFilename {
+            recording.storagePath = newFilename
+            recording.fileFormat = "m4a"
+        }
+
+        // Update file size
+        let newURL = AudioImporter.recordingsDirectory.appendingPathComponent(newFilename)
+        let attrs = try? FileManager.default.attributesOfItem(atPath: newURL.path)
+        recording.fileSizeBytes = attrs?[.size] as? Int
+
+        let cutDuration = region.end - region.start
+
+        // Remap all marker positions
+        for marker in allMarkers {
+            guard let pos = marker.positionSeconds else { continue }
+            if pos >= region.start && pos <= region.end {
+                // Marker inside cut region (including boundary crop markers) — delete it
+                context.delete(marker)
+            } else if pos >= region.end {
+                // Marker after cut region — shift left
+                marker.positionSeconds = pos - cutDuration
+            }
+            // Markers before the cut region stay unchanged
+        }
+
+        recording.durationSeconds = newDuration
+        previewDuration = newDuration
+
+        // Clamp preview position
+        if previewPosition > newDuration { previewPosition = newDuration }
+        else if previewPosition >= region.start { previewPosition = region.start }
+
+        try? context.save()
+
+        // Reload waveform
+        amplitudes = []
+        await loadWaveform()
+    }
+
+    /// Restores the audio file and marker positions from the last cut.
+    func undoLastCut(markers: [AyahMarker], context: ModelContext) async throws {
+        guard let snapshot = undoStack.popLast() else { return }
+        guard let path = recording.storagePath else { return }
+
+        isProcessingEdit = true
+        defer { isProcessingEdit = false }
+
+        stopPreview()
+
+        // Save current state to redo stack before restoring
+        let currentURL = AudioImporter.recordingsDirectory.appendingPathComponent(path)
+        let redoBackupURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("redo_\(UUID().uuidString).m4a")
+        try FileManager.default.copyItem(at: currentURL, to: redoBackupURL)
+
+        let allMarkers = sortedMarkers(in: context)
+        let redoSnapshot = CutSnapshot(
+            backupURL: redoBackupURL,
+            duration: recording.safeDuration,
+            markerPositions: allMarkers.compactMap { m in
+                guard let id = m.id, let pos = m.positionSeconds else { return nil }
+                return (id, pos)
+            }
+        )
+        redoStack.append(redoSnapshot)
+
+        // Restore the backed-up audio file
+        try FileManager.default.removeItem(at: currentURL)
+        let destURL = AudioImporter.recordingsDirectory
+            .appendingPathComponent(URL(fileURLWithPath: path).deletingPathExtension()
+                .appendingPathExtension("m4a").lastPathComponent)
+        try FileManager.default.moveItem(at: snapshot.backupURL, to: destURL)
+
+        let restoredFilename = destURL.lastPathComponent
+        recording.storagePath = restoredFilename
+        recording.fileFormat = "m4a"
+        recording.durationSeconds = snapshot.duration
+        previewDuration = snapshot.duration
+
+        let attrs = try? FileManager.default.attributesOfItem(atPath: destURL.path)
+        recording.fileSizeBytes = attrs?[.size] as? Int
+
+        // Restore marker positions
+        let currentMarkers = sortedMarkers(in: context)
+        for (id, pos) in snapshot.markerPositions {
+            if let marker = currentMarkers.first(where: { $0.id == id }) {
+                marker.positionSeconds = pos
+            }
+        }
+
+        if previewPosition > snapshot.duration { previewPosition = snapshot.duration }
+
+        try? context.save()
+
+        amplitudes = []
+        await loadWaveform()
+    }
+
+    /// Re-applies the last undone cut.
+    func redoLastCut(markers: [AyahMarker], context: ModelContext) async throws {
+        guard let snapshot = redoStack.popLast() else { return }
+        guard let path = recording.storagePath else { return }
+
+        isProcessingEdit = true
+        defer { isProcessingEdit = false }
+
+        stopPreview()
+
+        // Save current state to undo stack before re-applying
+        let currentURL = AudioImporter.recordingsDirectory.appendingPathComponent(path)
+        let undoBackupURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("undo_\(UUID().uuidString).m4a")
+        try FileManager.default.copyItem(at: currentURL, to: undoBackupURL)
+
+        let allMarkers = sortedMarkers(in: context)
+        let undoSnapshot = CutSnapshot(
+            backupURL: undoBackupURL,
+            duration: recording.safeDuration,
+            markerPositions: allMarkers.compactMap { m in
+                guard let id = m.id, let pos = m.positionSeconds else { return nil }
+                return (id, pos)
+            }
+        )
+        undoStack.append(undoSnapshot)
+
+        // Restore the redo snapshot
+        try FileManager.default.removeItem(at: currentURL)
+        let destURL = AudioImporter.recordingsDirectory
+            .appendingPathComponent(URL(fileURLWithPath: path).deletingPathExtension()
+                .appendingPathExtension("m4a").lastPathComponent)
+        try FileManager.default.moveItem(at: snapshot.backupURL, to: destURL)
+
+        let restoredFilename = destURL.lastPathComponent
+        recording.storagePath = restoredFilename
+        recording.fileFormat = "m4a"
+        recording.durationSeconds = snapshot.duration
+        previewDuration = snapshot.duration
+
+        let attrs = try? FileManager.default.attributesOfItem(atPath: destURL.path)
+        recording.fileSizeBytes = attrs?[.size] as? Int
+
+        let currentMarkers = sortedMarkers(in: context)
+        for (id, pos) in snapshot.markerPositions {
+            if let marker = currentMarkers.first(where: { $0.id == id }) {
+                marker.positionSeconds = pos
+            }
+        }
+
+        if previewPosition > snapshot.duration { previewPosition = snapshot.duration }
+
+        try? context.save()
+
+        amplitudes = []
+        await loadWaveform()
+    }
+
+    /// Cleans up any undo/redo backup files.
+    func cleanupUndoBackups() {
+        for snapshot in undoStack { try? FileManager.default.removeItem(at: snapshot.backupURL) }
+        for snapshot in redoStack { try? FileManager.default.removeItem(at: snapshot.backupURL) }
+        undoStack.removeAll()
+        redoStack.removeAll()
+    }
+
+    // MARK: - Finalize
+
+    /// Keeps only annotated segment audio (excluding crop regions and unannotated gaps),
+    /// concatenates them, remaps marker positions, saves segments, and updates the recording.
+    func finalizeRecording(markers: [AyahMarker], context: ModelContext) async throws {
+        guard let path = recording.storagePath else { return }
+        let url = AudioImporter.recordingsDirectory.appendingPathComponent(path)
+
+        let totalDuration = recording.safeDuration
+        let ayahMarkers = markers.filter { $0.resolvedMarkerType == .ayah }
+            .sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
+        let cropRegions = Self.computeCropRegions(from: markers, totalDuration: totalDuration)
+
+        // Build segment ranges using state-machine logic matching saveSegments.
+        // A marker with a start ayah opens a segment; a marker with an end ayah
+        // (or a new start ayah) closes the previous one. Gaps between segments
+        // (e.g. rakaah breaks) are excluded from the kept ranges.
+        var segmentRanges: [(start: Double, end: Double)] = []
+        var pendingStart: Double? = nil
+
+        for marker in ayahMarkers {
+            let pos = marker.positionSeconds ?? 0
+            let hasEnd = marker.assignedEndSurah != nil && marker.assignedEndAyah != nil
+            let hasStart = marker.assignedSurah != nil && marker.assignedAyah != nil
+
+            if hasEnd, let start = pendingStart {
+                segmentRanges.append((start, pos))
+                pendingStart = nil
+            } else if !hasEnd, hasStart, let start = pendingStart {
+                // New start implicitly closes the previous segment
+                segmentRanges.append((start, pos))
+                pendingStart = nil
+            }
+
+            if hasStart {
+                pendingStart = pos
+            }
+        }
+
+        // Last open segment extends to end of file
+        if let start = pendingStart {
+            segmentRanges.append((start, totalDuration))
+        }
+
+        // If no annotated segments, just save markers and return
+        guard !segmentRanges.isEmpty else {
+            try saveSegments(markers: ayahMarkers, context: context)
+            return
+        }
+
+        // Subtract crop regions from segment ranges
+        var keptRanges: [(start: Double, end: Double)] = []
+        for seg in segmentRanges {
+            var remaining = [seg]
+            for crop in cropRegions.sorted(by: { $0.start < $1.start }) {
+                var next: [(start: Double, end: Double)] = []
+                for r in remaining {
+                    if crop.end <= r.start || crop.start >= r.end {
+                        // No overlap
+                        next.append(r)
+                    } else {
+                        // Crop overlaps — split
+                        if r.start < crop.start { next.append((r.start, crop.start)) }
+                        if r.end > crop.end { next.append((crop.end, r.end)) }
+                    }
+                }
+                remaining = next
+            }
+            keptRanges.append(contentsOf: remaining)
+        }
+
+        guard !keptRanges.isEmpty else { return }
+
+        isProcessingEdit = true
+        processingMessage = "Finalizing…"
+        defer { isProcessingEdit = false }
+
+        stopPreview()
+
+        let (newDuration, mapping) = try await audioEditor.finalize(
+            fileURL: url, segmentRanges: keptRanges
+        )
+
+        // Update storagePath if format changed
+        let newFilename = URL(fileURLWithPath: path).deletingPathExtension()
+            .appendingPathExtension("m4a").lastPathComponent
+        if recording.storagePath != newFilename {
+            recording.storagePath = newFilename
+            recording.fileFormat = "m4a"
+        }
+
+        // Update file size
+        let newURL = AudioImporter.recordingsDirectory.appendingPathComponent(newFilename)
+        let attrs = try? FileManager.default.attributesOfItem(atPath: newURL.path)
+        recording.fileSizeBytes = attrs?[.size] as? Int
+
+        // Remap ayah marker positions; delete those that fall in removed regions
+        for marker in ayahMarkers {
+            guard let pos = marker.positionSeconds else { continue }
+            if let map = mapping.first(where: { pos >= $0.oldStart && pos < $0.oldEnd }) {
+                marker.positionSeconds = map.newStart + (pos - map.oldStart)
+            } else {
+                context.delete(marker)
+            }
+        }
+
+        // Delete all crop markers
+        for marker in markers.filter({ $0.resolvedMarkerType != .ayah }) {
+            context.delete(marker)
+        }
+
+        recording.durationSeconds = newDuration
+        previewDuration = newDuration
+
+        // Force waveform reload
+        amplitudes = []
+        await loadWaveform()
+
+        // Save segments from remaining ayah markers
+        let remainingAyah = sortedMarkers(in: context).filter { $0.resolvedMarkerType == .ayah }
+        if !remainingAyah.isEmpty {
+            try saveSegments(markers: remainingAyah, context: context)
+        } else {
+            try context.save()
+        }
     }
 
     // MARK: - Helpers

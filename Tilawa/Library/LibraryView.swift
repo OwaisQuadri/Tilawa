@@ -64,7 +64,7 @@ struct LibraryView: View {
                     }()
                     ProgressView(label)
                         .padding(20)
-                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+                        .glassEffect(.regular, in: RoundedRectangle(cornerRadius: 12))
                 }
             }
         }
@@ -152,7 +152,7 @@ struct LibraryView: View {
             }
 
             if !recordings.isEmpty {
-                Section("Recordings") {
+                Section {
                     ForEach(recordings, id: \.id) { recording in
                         NavigationLink {
                             RecordingDetailView(recording: recording)
@@ -171,9 +171,25 @@ struct LibraryView: View {
                             }
                         }
                     }
+                } header: {
+                    HStack {
+                        Text("Recordings")
+                        Spacer()
+                        Text(totalRecordingSizeLabel)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }
+    }
+
+    private var totalRecordingSizeLabel: String {
+        let total = recordings.compactMap(\.fileSizeBytes).reduce(0, +)
+        guard total > 0 else { return "" }
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(total))
     }
 
     // MARK: - Empty state
