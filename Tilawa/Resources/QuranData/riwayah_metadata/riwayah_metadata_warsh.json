@@ -1,0 +1,577 @@
+{
+  "riwayah": "warsh",
+  "totalPages": 604,
+  "totalAyahs": 6214,
+  "surahs": [
+    {
+      "number": 1,
+      "ayahCount": 7,
+      "startPage": 1
+    },
+    {
+      "number": 2,
+      "ayahCount": 285,
+      "startPage": 2
+    },
+    {
+      "number": 3,
+      "ayahCount": 200,
+      "startPage": 50
+    },
+    {
+      "number": 4,
+      "ayahCount": 175,
+      "startPage": 77
+    },
+    {
+      "number": 5,
+      "ayahCount": 122,
+      "startPage": 106
+    },
+    {
+      "number": 6,
+      "ayahCount": 167,
+      "startPage": 128
+    },
+    {
+      "number": 7,
+      "ayahCount": 206,
+      "startPage": 151
+    },
+    {
+      "number": 8,
+      "ayahCount": 76,
+      "startPage": 177
+    },
+    {
+      "number": 9,
+      "ayahCount": 130,
+      "startPage": 187
+    },
+    {
+      "number": 10,
+      "ayahCount": 109,
+      "startPage": 208
+    },
+    {
+      "number": 11,
+      "ayahCount": 121,
+      "startPage": 221
+    },
+    {
+      "number": 12,
+      "ayahCount": 111,
+      "startPage": 235
+    },
+    {
+      "number": 13,
+      "ayahCount": 44,
+      "startPage": 249
+    },
+    {
+      "number": 14,
+      "ayahCount": 54,
+      "startPage": 255
+    },
+    {
+      "number": 15,
+      "ayahCount": 99,
+      "startPage": 262
+    },
+    {
+      "number": 16,
+      "ayahCount": 128,
+      "startPage": 267
+    },
+    {
+      "number": 17,
+      "ayahCount": 110,
+      "startPage": 282
+    },
+    {
+      "number": 18,
+      "ayahCount": 105,
+      "startPage": 293
+    },
+    {
+      "number": 19,
+      "ayahCount": 99,
+      "startPage": 305
+    },
+    {
+      "number": 20,
+      "ayahCount": 134,
+      "startPage": 312
+    },
+    {
+      "number": 21,
+      "ayahCount": 111,
+      "startPage": 322
+    },
+    {
+      "number": 22,
+      "ayahCount": 76,
+      "startPage": 332
+    },
+    {
+      "number": 23,
+      "ayahCount": 119,
+      "startPage": 342
+    },
+    {
+      "number": 24,
+      "ayahCount": 62,
+      "startPage": 350
+    },
+    {
+      "number": 25,
+      "ayahCount": 77,
+      "startPage": 359
+    },
+    {
+      "number": 26,
+      "ayahCount": 226,
+      "startPage": 367
+    },
+    {
+      "number": 27,
+      "ayahCount": 95,
+      "startPage": 377
+    },
+    {
+      "number": 28,
+      "ayahCount": 88,
+      "startPage": 385
+    },
+    {
+      "number": 29,
+      "ayahCount": 69,
+      "startPage": 396
+    },
+    {
+      "number": 30,
+      "ayahCount": 59,
+      "startPage": 404
+    },
+    {
+      "number": 31,
+      "ayahCount": 33,
+      "startPage": 411
+    },
+    {
+      "number": 32,
+      "ayahCount": 30,
+      "startPage": 415
+    },
+    {
+      "number": 33,
+      "ayahCount": 73,
+      "startPage": 418
+    },
+    {
+      "number": 34,
+      "ayahCount": 54,
+      "startPage": 428
+    },
+    {
+      "number": 35,
+      "ayahCount": 46,
+      "startPage": 434
+    },
+    {
+      "number": 36,
+      "ayahCount": 82,
+      "startPage": 440
+    },
+    {
+      "number": 37,
+      "ayahCount": 182,
+      "startPage": 446
+    },
+    {
+      "number": 38,
+      "ayahCount": 86,
+      "startPage": 453
+    },
+    {
+      "number": 39,
+      "ayahCount": 72,
+      "startPage": 458
+    },
+    {
+      "number": 40,
+      "ayahCount": 84,
+      "startPage": 467
+    },
+    {
+      "number": 41,
+      "ayahCount": 53,
+      "startPage": 477
+    },
+    {
+      "number": 42,
+      "ayahCount": 50,
+      "startPage": 483
+    },
+    {
+      "number": 43,
+      "ayahCount": 89,
+      "startPage": 489
+    },
+    {
+      "number": 44,
+      "ayahCount": 56,
+      "startPage": 496
+    },
+    {
+      "number": 45,
+      "ayahCount": 36,
+      "startPage": 499
+    },
+    {
+      "number": 46,
+      "ayahCount": 34,
+      "startPage": 502
+    },
+    {
+      "number": 47,
+      "ayahCount": 39,
+      "startPage": 507
+    },
+    {
+      "number": 48,
+      "ayahCount": 29,
+      "startPage": 511
+    },
+    {
+      "number": 49,
+      "ayahCount": 18,
+      "startPage": 515
+    },
+    {
+      "number": 50,
+      "ayahCount": 45,
+      "startPage": 518
+    },
+    {
+      "number": 51,
+      "ayahCount": 60,
+      "startPage": 520
+    },
+    {
+      "number": 52,
+      "ayahCount": 47,
+      "startPage": 523
+    },
+    {
+      "number": 53,
+      "ayahCount": 61,
+      "startPage": 526
+    },
+    {
+      "number": 54,
+      "ayahCount": 55,
+      "startPage": 528
+    },
+    {
+      "number": 55,
+      "ayahCount": 77,
+      "startPage": 531
+    },
+    {
+      "number": 56,
+      "ayahCount": 99,
+      "startPage": 534
+    },
+    {
+      "number": 57,
+      "ayahCount": 28,
+      "startPage": 537
+    },
+    {
+      "number": 58,
+      "ayahCount": 21,
+      "startPage": 542
+    },
+    {
+      "number": 59,
+      "ayahCount": 24,
+      "startPage": 545
+    },
+    {
+      "number": 60,
+      "ayahCount": 13,
+      "startPage": 549
+    },
+    {
+      "number": 61,
+      "ayahCount": 14,
+      "startPage": 551
+    },
+    {
+      "number": 62,
+      "ayahCount": 11,
+      "startPage": 553
+    },
+    {
+      "number": 63,
+      "ayahCount": 11,
+      "startPage": 554
+    },
+    {
+      "number": 64,
+      "ayahCount": 18,
+      "startPage": 556
+    },
+    {
+      "number": 65,
+      "ayahCount": 12,
+      "startPage": 558
+    },
+    {
+      "number": 66,
+      "ayahCount": 12,
+      "startPage": 560
+    },
+    {
+      "number": 67,
+      "ayahCount": 31,
+      "startPage": 562
+    },
+    {
+      "number": 68,
+      "ayahCount": 52,
+      "startPage": 564
+    },
+    {
+      "number": 69,
+      "ayahCount": 52,
+      "startPage": 566
+    },
+    {
+      "number": 70,
+      "ayahCount": 44,
+      "startPage": 568
+    },
+    {
+      "number": 71,
+      "ayahCount": 30,
+      "startPage": 570
+    },
+    {
+      "number": 72,
+      "ayahCount": 28,
+      "startPage": 572
+    },
+    {
+      "number": 73,
+      "ayahCount": 18,
+      "startPage": 574
+    },
+    {
+      "number": 74,
+      "ayahCount": 55,
+      "startPage": 575
+    },
+    {
+      "number": 75,
+      "ayahCount": 39,
+      "startPage": 577
+    },
+    {
+      "number": 76,
+      "ayahCount": 31,
+      "startPage": 578
+    },
+    {
+      "number": 77,
+      "ayahCount": 50,
+      "startPage": 580
+    },
+    {
+      "number": 78,
+      "ayahCount": 40,
+      "startPage": 582
+    },
+    {
+      "number": 79,
+      "ayahCount": 45,
+      "startPage": 583
+    },
+    {
+      "number": 80,
+      "ayahCount": 42,
+      "startPage": 585
+    },
+    {
+      "number": 81,
+      "ayahCount": 29,
+      "startPage": 586
+    },
+    {
+      "number": 82,
+      "ayahCount": 19,
+      "startPage": 587
+    },
+    {
+      "number": 83,
+      "ayahCount": 36,
+      "startPage": 587
+    },
+    {
+      "number": 84,
+      "ayahCount": 25,
+      "startPage": 589
+    },
+    {
+      "number": 85,
+      "ayahCount": 22,
+      "startPage": 590
+    },
+    {
+      "number": 86,
+      "ayahCount": 17,
+      "startPage": 591
+    },
+    {
+      "number": 87,
+      "ayahCount": 19,
+      "startPage": 591
+    },
+    {
+      "number": 88,
+      "ayahCount": 26,
+      "startPage": 592
+    },
+    {
+      "number": 89,
+      "ayahCount": 32,
+      "startPage": 593
+    },
+    {
+      "number": 90,
+      "ayahCount": 20,
+      "startPage": 594
+    },
+    {
+      "number": 91,
+      "ayahCount": 15,
+      "startPage": 595
+    },
+    {
+      "number": 92,
+      "ayahCount": 21,
+      "startPage": 595
+    },
+    {
+      "number": 93,
+      "ayahCount": 11,
+      "startPage": 596
+    },
+    {
+      "number": 94,
+      "ayahCount": 8,
+      "startPage": 596
+    },
+    {
+      "number": 95,
+      "ayahCount": 8,
+      "startPage": 597
+    },
+    {
+      "number": 96,
+      "ayahCount": 20,
+      "startPage": 597
+    },
+    {
+      "number": 97,
+      "ayahCount": 5,
+      "startPage": 598
+    },
+    {
+      "number": 98,
+      "ayahCount": 8,
+      "startPage": 598
+    },
+    {
+      "number": 99,
+      "ayahCount": 9,
+      "startPage": 599
+    },
+    {
+      "number": 100,
+      "ayahCount": 11,
+      "startPage": 599
+    },
+    {
+      "number": 101,
+      "ayahCount": 10,
+      "startPage": 600
+    },
+    {
+      "number": 102,
+      "ayahCount": 8,
+      "startPage": 600
+    },
+    {
+      "number": 103,
+      "ayahCount": 3,
+      "startPage": 601
+    },
+    {
+      "number": 104,
+      "ayahCount": 9,
+      "startPage": 601
+    },
+    {
+      "number": 105,
+      "ayahCount": 5,
+      "startPage": 601
+    },
+    {
+      "number": 106,
+      "ayahCount": 5,
+      "startPage": 602
+    },
+    {
+      "number": 107,
+      "ayahCount": 6,
+      "startPage": 602
+    },
+    {
+      "number": 108,
+      "ayahCount": 3,
+      "startPage": 602
+    },
+    {
+      "number": 109,
+      "ayahCount": 6,
+      "startPage": 603
+    },
+    {
+      "number": 110,
+      "ayahCount": 3,
+      "startPage": 603
+    },
+    {
+      "number": 111,
+      "ayahCount": 5,
+      "startPage": 603
+    },
+    {
+      "number": 112,
+      "ayahCount": 4,
+      "startPage": 604
+    },
+    {
+      "number": 113,
+      "ayahCount": 5,
+      "startPage": 604
+    },
+    {
+      "number": 114,
+      "ayahCount": 6,
+      "startPage": 604
+    }
+  ]
+}
