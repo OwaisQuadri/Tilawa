@@ -4,29 +4,22 @@ Deferred work that is too large or too dependent on future decisions.
 
 ---
 
-## 1. Ayah Offset Mapping for Non-Hafs Riwayahs
+## 1. Re-enable Warsh/Qaloon in Riwayah Compat Builder
 
 **Problem**
-The KFGQPC dataset has text for 6 more riwayahs (warsh, qaloon, bazzi, qunbul,
-doori_abu_amr, soosi) but they use different ayah numbering than Hafs:
-
-| Riwayah       | Ayah count | Offset vs Hafs |
-|---------------|------------|----------------|
-| warsh, qaloon | 6214       | −22            |
-| doori, soosi  | 6217       | −19            |
-| bazzi, qunbul | 6220       | −16            |
-
-Directly comparing (sura, aya_no) across these produces wrong pairings (e.g.
-Hafs 1:2 Al-Hamd is compared against Warsh 1:2 Ar-Rahman instead of Warsh 1:1).
+`Scripts/riwayah_compat_builder.py` currently skips Warsh and Qaloon because
+comparing (surah, ayah) positions across riwayat directly gives wrong pairings
+(Hafs 1:2 Al-Hamd was paired with the wrong Warsh ayah). Task 1 unblocks this.
 
 **What's needed**
-A per-surah offset table: for each surah, how many ayahs ahead or behind each
-riwayah is relative to Hafs. This lets the builder align positions correctly
-before comparing text.
+- Re-enable `warsh` and `qaloon` in `SOURCES` in the builder script
+- Before comparing Hafs and Warsh/Qaloon text at each position, translate the
+  Hafs `AyahRef` to the native Warsh/Qaloon number using the offset map JSON
+  (the builder is a Python script, so read the JSON directly rather than calling
+  the Swift service)
+- Re-run the builder to regenerate `riwayah_compatibility.json`
 
-**Then**
-Once the offset mapping exists, re-run the builder with those 6 riwayahs
-re-enabled in SOURCES and the comparison will be accurate.
+**Scope**: self-contained script change + regenerating one JSON file.
 
 ---
 
@@ -38,16 +31,16 @@ selects Warsh, they hear the Warsh recitation but read the Hafs text — which
 may differ at variant positions.
 
 **What's needed**
-- Source or license mushaf text for each riwayah (KFGQPC data is available for
-  8; others need research)
-- Display logic: render the mushaf matching the session's selected riwayah
-- Handle different ayah counts: a Warsh mushaf has 6214 ayahs, so the UI
-  needs to know which "Hafs ayah number" corresponds to which "Warsh ayah number"
-  at each position
+- `RiwayahTextService` (added in PR #30) provides correct per-riwayah text —
+  it just needs to be wired to the mushaf view
+- The mushaf renderer uses QPC glyph fonts (Hafs-only); non-Hafs riwayat need
+  a Unicode/Amiri-font fallback rendering path
+- Navigation/highlighting must use `AyahOffsetService` to translate between
+  Hafs internal positions and native Warsh/Qaloon ayah numbers
 
 **Dependency**
-This requires the offset mapping from task 1 above. It also likely requires
-Swift model changes (which mushaf text to load, how to navigate across riwayahs).
+Task 1 is done. Requires a decision on the Unicode rendering approach before
+Swift model changes.
 
 ---
 
@@ -65,9 +58,9 @@ A richer compatibility model that can express:
 - "Hafs 1:2 (Al-Hamd) is textually equivalent to Warsh 1:1 (Al-Hamd)"
 
 This may require storing cross-riwayah ayah mappings alongside the compatibility
-groups, and updating RiwayahCompatibilityService.swift and ReciterResolver.swift
+groups, and updating `RiwayahCompatibilityService.swift` and `ReciterResolver.swift`
 to use them.
 
 **Dependency**
-Requires both the offset mapping (task 1) and the mushaf display work (task 2)
-to be designed first, since they all share the same underlying alignment model.
+Requires tasks 1 and 2 to be completed first, since they all share the same
+underlying alignment model.
