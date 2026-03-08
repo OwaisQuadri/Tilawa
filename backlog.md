@@ -64,3 +64,24 @@ to use them.
 **Dependency**
 Requires tasks 1 and 2 to be completed first, since they all share the same
 underlying alignment model.
+
+---
+
+## 4. Finalize Should Strip Audio Between Ayah Segments
+
+**Problem**
+When finalizing a recording, the app preserves all audio between segments. If a
+recording has `1:1–1:7` from `0:00` to `0:30` and then `1:7` closes without a new
+ayah starting, with no marker until `19:1` at `0:45`, the gap from `0:30` to `0:45`
+is dead air. Finalize should strip/crop out such gaps so the exported audio contains
+only the marked ayah segments with no silence or unrecited audio between them.
+
+**What's needed**
+- During finalize, identify gaps between consecutive segments (where the end of one
+  segment is not immediately followed by the start of the next)
+- Use `AVAssetExportSession` to export only the marked time ranges, concatenating
+  them without the gaps
+- Preserve original audio quality and format
+
+**Scope**: Moderate — requires changes to the finalize/export pipeline to compose
+multiple time ranges into a single output file.

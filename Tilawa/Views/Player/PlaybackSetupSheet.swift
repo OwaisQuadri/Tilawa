@@ -511,23 +511,32 @@ struct PlaybackSetupSheet: View {
         if !reciter.hasCDN {
             return reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter, targetRiwayah: targetRiwayah) : nil
         }
-        // CDN reciter: use pre-computed availability check
-        guard reciter.availabilityChecked else { return nil }
-        let missing = Set(reciter.missingAyahs)
+        // CDN reciter: use per-source pre-computed availability check
+        let sources = reciter.cdnSources ?? []
+        guard !sources.isEmpty else { return nil }
 
-        let cdnRiwayaat = (reciter.cdnSources ?? []).compactMap { src -> Riwayah? in
-            guard let raw = src.riwayah else { return nil }
-            return Riwayah(rawValue: raw)
-        }
+        // Build union of missing ayahs across all checked sources
+        let checkedSources = sources.filter { $0.availabilityChecked }
+        guard !checkedSources.isEmpty else { return nil }
 
-        // Exact CDN source for targetRiwayah: standard behavior (nil = full coverage).
-        if cdnRiwayaat.contains(targetRiwayah) {
+        // For exact riwayah match, use that specific source's missing data
+        if let exactSource = checkedSources.first(where: { $0.safeRiwayah == targetRiwayah }) {
+            let missing = Set(exactSource.missingAyahs)
             guard !missing.isEmpty else { return nil }
             return buildAvailableSet(excluding: missing)
         }
 
-        // No exact CDN source: build compatibility-filtered set.
+        // No exact CDN source: build compatibility-filtered set using all sources
+        let cdnRiwayaat = sources.compactMap { src -> Riwayah? in
+            guard let raw = src.riwayah else { return nil }
+            return Riwayah(rawValue: raw)
+        }
         guard !cdnRiwayaat.isEmpty else { return nil }
+
+        // Union of missing across all checked sources
+        var allMissing = Set<AyahRef>()
+        for src in checkedSources { allMissing.formUnion(src.missingAyahs) }
+
         let compat = RiwayahCompatibilityService.shared
         var filtered = Set<AyahRef>()
         filtered.reserveCapacity(6236)
@@ -535,7 +544,7 @@ struct PlaybackSetupSheet: View {
             let count = metadata.ayahCount(surah: surah)
             for ayah in 1...max(1, count) {
                 let ref = AyahRef(surah: surah, ayah: ayah)
-                if missing.contains(ref) { continue }
+                if allMissing.contains(ref) { continue }
                 let compatibles = compat.compatibleRiwayaat(surah: surah, ayah: ayah, targetRiwayah: targetRiwayah)
                 if cdnRiwayaat.contains(where: { compatibles.contains($0) }) {
                     filtered.insert(ref)
@@ -630,9 +639,11 @@ struct PlaybackSetupSheet: View {
 
     /// Returns true when a CDN reciter is known to provide gapless coverage for targetRiwayah.
     private func isConfirmedFullCoverage(_ reciter: Reciter, targetRiwayah: Riwayah) -> Bool {
-        guard reciter.hasCDN && reciter.availabilityChecked else { return false }
-        let cdnRiwayaat = (reciter.cdnSources ?? []).compactMap { Riwayah(rawValue: $0.riwayah ?? "") }
-        return cdnRiwayaat.contains(targetRiwayah) && Set(reciter.missingAyahs).isEmpty
+        guard reciter.hasCDN else { return false }
+        guard let source = (reciter.cdnSources ?? []).first(where: {
+            $0.safeRiwayah == targetRiwayah
+        }) else { return false }
+        return source.availabilityChecked && source.missingAyahs.isEmpty
     }
 
     /// True if all ayahs in the preset's range are in the available set.
@@ -722,14 +733,18 @@ struct PlaybackSetupSheet: View {
         guard !isCheckingAvailability, let s = settings else { return }
         let targetRiwayah = s.safeRiwayah
 
+        let hasUncheckedSources: (Reciter) -> Bool = { r in
+            r.hasCDN && (r.cdnSources ?? []).contains { !$0.availabilityChecked }
+        }
+
         var toCheck: [Reciter]
         if let reciterId = s.selectedReciterId,
            let reciter = allReciters.first(where: { $0.id == reciterId }),
-           reciter.hasCDN && !reciter.availabilityChecked {
+           hasUncheckedSources(reciter) {
             toCheck = [reciter]
         } else if s.selectedReciterId == nil {
             toCheck = enabledMatchingReciters(riwayah: targetRiwayah, settings: s)
-                .filter { $0.hasCDN && !$0.availabilityChecked }
+                .filter { hasUncheckedSources($0) }
         } else {
             return
         }
@@ -739,12 +754,14 @@ struct PlaybackSetupSheet: View {
         Task {
             defer { isCheckingAvailability = false }
             for reciter in toCheck {
-                let missing = await CDNAvailabilityChecker.shared.findMissingAyahs(
-                    reciter: reciter, source: nil, progress: { _ in })
-                guard let data = try? JSONEncoder().encode(missing),
-                      let json = String(data: data, encoding: .utf8) else { continue }
-                reciter.missingAyahsJSON = json
-                try? context.save()
+                for source in (reciter.cdnSources ?? []) where !source.availabilityChecked {
+                    let missing = await CDNAvailabilityChecker.shared.findMissingAyahs(
+                        reciter: reciter, source: source, progress: { _ in })
+                    guard let data = try? JSONEncoder().encode(missing),
+                          let json = String(data: data, encoding: .utf8) else { continue }
+                    source.missingAyahsJSON = json
+                    try? context.save()
+                }
             }
             snapRangeToAvailableIfNeeded()
         }

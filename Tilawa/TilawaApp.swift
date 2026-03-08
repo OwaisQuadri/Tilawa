@@ -38,7 +38,16 @@ struct TilawaApp: App {
                 .modelContainer(TilawaApp.sharedModelContainer)
                 .task { await seedDefaultReciterIfNeeded() }
                 .task { DownloadManager.shared.requestNotificationPermission() }
+                .task { await checkForCDNUpdates() }
         }
+    }
+
+    // MARK: - Daily CDN Update Check
+
+    @MainActor
+    private func checkForCDNUpdates() async {
+        let context = TilawaApp.sharedModelContainer.mainContext
+        await CDNUpdateService.shared.checkForUpdatesIfNeeded(context: context)
     }
 
     // MARK: - First-Launch Seeding

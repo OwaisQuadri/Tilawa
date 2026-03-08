@@ -15,6 +15,7 @@ struct CDNAvailabilityView: View {
 
     @State private var progress: Double = 0
     @State private var completedCount: Int = 0
+    @State private var missingCount: Int = 0
     @State private var isComplete = false
     @State private var showReciterPicker = false
     @State private var checkTask: Task<Void, Never>?
@@ -26,18 +27,40 @@ struct CDNAvailabilityView: View {
             Spacer()
 
             VStack(spacing: 12) {
-                Image(systemName: isComplete ? "checkmark.circle" : "network")
-                    .font(.system(size: 44))
-                    .foregroundStyle(.tint)
+                if isComplete {
+                    Image(systemName: missingCount == 0 ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                        .font(.system(size: 44))
+                        .foregroundStyle(missingCount == 0 ? .green : .orange)
+                } else {
+                    Image(systemName: "network")
+                        .font(.system(size: 44))
+                        .foregroundStyle(.tint)
+                }
 
                 Text(isComplete ? "Availability Checked" : "Checking Availability")
                     .font(.title2.weight(.semibold))
 
-                Text("Verifying which ayaat are available from the CDN for \(reciter.safeName).")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal)
+                if isComplete {
+                    if missingCount == 0 {
+                        Text("All \(totalAyahs) ayaat are available from the CDN.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    } else {
+                        Text("\(totalAyahs - missingCount)/\(totalAyahs) ayaat available. \(missingCount) missing — these will be skipped during playback.")
+                            .font(.subheadline)
+                            .foregroundStyle(.orange)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
+                } else {
+                    Text("Verifying which ayaat are available from the CDN for \(reciter.safeName).")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                }
             }
 
             VStack(spacing: 8) {
@@ -118,18 +141,20 @@ struct CDNAvailabilityView: View {
 
             guard !Task.isCancelled else { return }
 
-            // Persist result on the reciter model
+            // Persist result on the specific CDN source
+            let resolvedSource = source ?? reciter.cdnSources?.first
             if let encoded = try? JSONEncoder().encode(missing),
                let json = String(data: encoded, encoding: .utf8) {
-                reciter.missingAyahsJSON = json
+                resolvedSource?.missingAyahsJSON = json
             } else {
-                reciter.missingAyahsJSON = "[]"
+                resolvedSource?.missingAyahsJSON = "[]"
             }
             try? context.save()
 
             await MainActor.run {
                 self.progress = 1.0
                 self.completedCount = totalAyahs
+                self.missingCount = missing.count
                 self.isComplete = true
             }
         }

@@ -139,6 +139,19 @@ actor AudioFileCache {
         try fileManager.removeItem(at: dir)
     }
 
+    /// Deletes only the cached files belonging to a specific CDN source.
+    func deleteCache(for reciter: Reciter, source: ReciterCDNSource) {
+        let meta = QuranMetadataService.shared
+        for surah in 1...114 {
+            let count = meta.ayahCount(surah: surah)
+            for ayah in 1...max(1, count) {
+                let ref = AyahRef(surah: surah, ayah: ayah)
+                let url = localFileURL(for: ref, reciter: reciter, source: source)
+                try? fileManager.removeItem(at: url)
+            }
+        }
+    }
+
     /// Returns total bytes used by a reciter's cache.
     func cacheSize(for reciter: Reciter) -> Int64 {
         let dir = cacheDirectory(for: reciter)

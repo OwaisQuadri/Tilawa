@@ -115,7 +115,7 @@ final class ManifestImportViewModel {
         let name     = urlFormatName.trimmingCharacters(in: .whitespaces)
         let template = urlFormatTemplate.trimmingCharacters(in: .whitespaces)
 
-        guard !name.isEmpty else { errorMessage = "Reciter name is required."; return }
+        guard targetReciter != nil || !name.isEmpty else { errorMessage = "Reciter name is required."; return }
         guard !template.isEmpty else { errorMessage = "URL template is required."; return }
 
         let hasSurahToken = template.contains("${s")

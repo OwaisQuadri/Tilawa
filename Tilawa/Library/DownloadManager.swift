@@ -18,6 +18,7 @@ final class DownloadManager {
     struct DownloadJob: Identifiable {
         let id: UUID
         let reciterId: UUID
+        let sourceId: UUID?
         let reciterName: String
         let totalSurahCount: Int
         var surahProgress: [Int: Double] = [:]  // surah → 0.0–1.0
@@ -49,6 +50,10 @@ final class DownloadManager {
         jobs.values.first { $0.reciterId == reciterId && !$0.isDone }
     }
 
+    func activeJob(for reciterId: UUID, sourceId: UUID) -> DownloadJob? {
+        jobs.values.first { $0.reciterId == reciterId && $0.sourceId == sourceId && !$0.isDone }
+    }
+
     func recentlyCompletedJob(for reciterId: UUID) -> DownloadJob? {
         jobs.values.first { $0.reciterId == reciterId && $0.isDone }
     }
@@ -66,6 +71,7 @@ final class DownloadManager {
         jobs[jobId] = DownloadJob(
             id: jobId,
             reciterId: reciter.id!,
+            sourceId: resolvedSource?.id,
             reciterName: reciter.safeName,
             totalSurahCount: surahs.count
         )
