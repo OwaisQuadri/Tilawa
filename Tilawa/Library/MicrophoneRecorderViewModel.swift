@@ -121,7 +121,8 @@ final class MicrophoneRecorderViewModel: NSObject {
         let fileSize = (try? FileManager.default.attributesOfItem(
             atPath: destURL.path)[.size] as? Int) ?? 0
 
-        let recording = Recording(title: title.isEmpty ? "New Recording" : title,
+        let defaultTitle = (startDate ?? Date()).formatted(date: .abbreviated, time: .shortened)
+        let recording = Recording(title: title.isEmpty ? defaultTitle : title,
                                   storagePath: filename)
         recording.id = recordingId
         recording.durationSeconds = elapsedSeconds

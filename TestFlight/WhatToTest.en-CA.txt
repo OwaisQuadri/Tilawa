@@ -1,12 +1,9 @@
-## CDN Download & Cache Management
+## Recording Auto-Naming by Date & Time
 
-- Navigate to a reciter with CDN sources → tap Manage CDN (renamed from "Download Surahs")
-- Verify surahs show per-surah progress bars while downloading, green checkmarks when done
-- Tap menu (ellipsis) → "Download All" downloads all uncached surahs in background
-- Navigate away and back to Manage CDN — download progress persists and updates
-- Tap menu → "Share CDN" and verify it opens share sheet with CDN URL
-- Download some surahs, then tap menu → "Clear Cache" → confirm deletion removes only that CDN's cached files
-- Verify other reciters' cached CDN files are unaffected by the cache clear
-- Tap "Check for Updates" — availability check runs with progress indicator
-- If uploading a CDN: complete upload, verify new version number increments
-- Disable Wi-Fi, verify "Check for Updates" gracefully handles network errors (no crash)
+- Open Library tab and start a new microphone recording
+- Record some audio, then stop
+- Verify the recording title defaults to the current date and time (e.g. "Mar 8, 2026, 3:42 PM") instead of "New Recording"
+- Tap the recording to open its detail view and verify the auto-generated title is displayed
+- Tap edit (pencil icon) and change the title to a custom name, save
+- Create another recording and verify it also gets an auto-generated date/time title
+- Verify that each new recording has a unique date/time title matching when it was created
