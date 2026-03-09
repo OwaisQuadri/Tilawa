@@ -7,7 +7,6 @@ most impact for the least work.
 |---|------|-------|
 | 1 | [Fix Audio Hitching Between Ayahs and on Pause](#1-fix-audio-hitching-between-ayahs-and-on-pause) | Small |
 | 2 | [Fix Page-Swipe UI Glitches](#2-fix-page-swipe-ui-glitches) | Small |
-| 3 | [Jump-to Recents Should Persist Between Sessions](#3-jump-to-recents-should-persist-between-sessions) | Tiny |
 | 4 | [Move CDN Download Status to Manage CDN Screen](#4-move-cdn-download-status-to-manage-cdn-screen) | Small |
 | 5 | [Show Total Playback Time in Setup Sheet](#5-show-total-playback-time-in-setup-sheet) | Small |
 | 6 | [Bismillah Before Each Surah (Except Tawbah)](#6-bismillah-before-each-surah-except-tawbah) | Small |
@@ -30,7 +29,7 @@ themselves are safe to run in parallel.
 
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
-| A — Jump-to sheet | 3, 10 | `JumpToAyahSheet`, `JumpHistory` |
+| A — Jump-to sheet | 10 | `JumpToAyahSheet`, `JumpHistory` |
 | B — Playback engine | 1, 5, 6 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | 4, 16 | `RecitersView`, `ReciterDetailView`, CDN views |
 | D — Recording pipeline | 8, 11 | Annotation editor, `SegmentAudioExtractor` |
@@ -81,24 +80,6 @@ navigation feel unreliable.
 
 **Scope**: Small–Medium — UI performance debugging and optimization in the
 mushaf rendering pipeline.
-
----
-
-## 3. Jump-to Recents Should Persist Between Sessions
-
-**Problem**
-The Recents tab in the jump-to sheet loses its history when the app is
-relaunched. Users who frequently navigate to the same ayahs have to re-find
-them each session.
-
-**What's needed**
-- Ensure `JumpHistory` entries (already SwiftData `@Model`) persist across app
-  launches — they may already be persisted but not queried correctly on relaunch
-- Verify that `ListeningSession` history (merged into recents) also persists
-- If recents are built from in-memory state, switch to a `@Query` or
-  `FetchDescriptor` so they survive restarts
-
-**Scope**: Tiny — likely a query/persistence fix, no new models needed.
 
 ---
 
