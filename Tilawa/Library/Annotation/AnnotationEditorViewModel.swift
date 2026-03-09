@@ -206,8 +206,15 @@ final class AnnotationEditorViewModel {
                 pendingStart = nil
             }
 
-            // Open a new segment if this marker has a start ayah
-            if hasStart, let sS = marker.assignedSurah, let sA = marker.assignedAyah {
+            // Open a new segment if this marker has a start ayah,
+            // UNLESS it also has an end ayah for the SAME surah:ayah
+            // (meaning it's purely a closing marker, not a transition).
+            let endMatchesStart = hasEnd && hasStart
+                && marker.assignedEndSurah == marker.assignedSurah
+                && marker.assignedEndAyah == marker.assignedAyah
+
+            if hasStart && !endMatchesStart,
+               let sS = marker.assignedSurah, let sA = marker.assignedAyah {
                 pendingStart = (markerPos, sS, sA, marker.reciterID, marker.riwayah)
             }
         }
@@ -630,36 +637,17 @@ final class AnnotationEditorViewModel {
             .sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
         let cropRegions = Self.computeCropRegions(from: markers, totalDuration: totalDuration)
 
-        // Build segment ranges using state-machine logic matching saveSegments.
-        // A marker with a start ayah opens a segment; a marker with an end ayah
-        // (or a new start ayah) closes the previous one. Gaps between segments
-        // (e.g. rakaah breaks) are excluded from the kept ranges.
-        var segmentRanges: [(start: Double, end: Double)] = []
-        var pendingStart: Double? = nil
-
-        for marker in ayahMarkers {
-            let pos = marker.positionSeconds ?? 0
-            let hasEnd = marker.assignedEndSurah != nil && marker.assignedEndAyah != nil
-            let hasStart = marker.assignedSurah != nil && marker.assignedAyah != nil
-
-            if hasEnd, let start = pendingStart {
-                segmentRanges.append((start, pos))
-                pendingStart = nil
-            } else if !hasEnd, hasStart, let start = pendingStart {
-                // New start implicitly closes the previous segment
-                segmentRanges.append((start, pos))
-                pendingStart = nil
-            }
-
-            if hasStart {
-                pendingStart = pos
-            }
+        // Build segment ranges, excluding gaps (e.g. rakaah breaks).
+        let markerInputs = ayahMarkers.map {
+            MarkerInput(
+                positionSeconds: $0.positionSeconds ?? 0,
+                assignedSurah: $0.assignedSurah,
+                assignedAyah: $0.assignedAyah,
+                assignedEndSurah: $0.assignedEndSurah,
+                assignedEndAyah: $0.assignedEndAyah
+            )
         }
-
-        // Last open segment extends to end of file
-        if let start = pendingStart {
-            segmentRanges.append((start, totalDuration))
-        }
+        let segmentRanges = Self.buildSegmentRanges(from: markerInputs, totalDuration: totalDuration)
 
         // If no annotated segments, just save markers and return
         guard !segmentRanges.isEmpty else {
@@ -752,5 +740,56 @@ final class AnnotationEditorViewModel {
         return all
             .filter { $0.recording?.id == recording.id }
             .sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
+    }
+
+    // MARK: - Testable segment-range builder
+
+    /// Lightweight input for `buildSegmentRanges`, avoiding SwiftData dependencies.
+    struct MarkerInput {
+        let positionSeconds: Double
+        let assignedSurah: Int?
+        let assignedAyah: Int?
+        let assignedEndSurah: Int?
+        let assignedEndAyah: Int?
+    }
+
+    /// Pure function: builds kept time ranges from sorted ayah markers.
+    /// A marker with a start ayah opens a segment; a marker with an end ayah
+    /// closes the previous one. When end == start on the same marker the
+    /// marker is treated as end-only (no new segment opens).
+    nonisolated static func buildSegmentRanges(
+        from markers: [MarkerInput],
+        totalDuration: Double
+    ) -> [(start: Double, end: Double)] {
+        var segmentRanges: [(start: Double, end: Double)] = []
+        var pendingStart: Double? = nil
+
+        for marker in markers {
+            let pos = marker.positionSeconds
+            let hasEnd = marker.assignedEndSurah != nil && marker.assignedEndAyah != nil
+            let hasStart = marker.assignedSurah != nil && marker.assignedAyah != nil
+
+            if hasEnd, let start = pendingStart {
+                segmentRanges.append((start, pos))
+                pendingStart = nil
+            } else if !hasEnd, hasStart, let start = pendingStart {
+                segmentRanges.append((start, pos))
+                pendingStart = nil
+            }
+
+            let endMatchesStart = hasEnd && hasStart
+                && marker.assignedEndSurah == marker.assignedSurah
+                && marker.assignedEndAyah == marker.assignedAyah
+
+            if hasStart && !endMatchesStart {
+                pendingStart = pos
+            }
+        }
+
+        if let start = pendingStart {
+            segmentRanges.append((start, totalDuration))
+        }
+
+        return segmentRanges
     }
 }
