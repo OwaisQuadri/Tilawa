@@ -1,9 +1,29 @@
-## Recording Auto-Naming by Date & Time
+## Sliding Window & Mini Player Indicators
 
-- Open Library tab and start a new microphone recording
-- Record some audio, then stop
-- Verify the recording title defaults to the current date and time (e.g. "Mar 8, 2026, 3:42 PM") instead of "New Recording"
-- Tap the recording to open its detail view and verify the auto-generated title is displayed
-- Tap edit (pencil icon) and change the title to a custom name, save
-- Create another recording and verify it also gets an auto-generated date/time title
-- Verify that each new recording has a unique date/time title matching when it was created
+### Sliding Window Mode
+- Open Play sheet and select a range (e.g., Fatiha 1:1-1:7)
+- Switch to "Sliding Window" mode and tap Play
+- Mini player should show: phase icon (□ for solo/connection, ■ for full range) + position (e.g. "1/7") + ayah repeat counter (e.g. "2/5") + range repeat counter (e.g. "1/3")
+- After repeating completes, verify the arrow icon shows (e.g. "3a" for continue 3 ayahs)
+- Press skip forward/back buttons - verify counters reset correctly to 1 when moving between phases
+- Press pause/play and verify the mini player responds correctly
+
+### Standard Repeat Mode
+- Open Play sheet, set "Each verse" to 5× and "Range" to 3×
+- Tap Play on a 3-ayah range
+- Mini player should show: phase icon (□ for solo when repeating ayahs, ■ otherwise) + position in queue (e.g. "2/3" when 3 ayahs)
+- As you play through, verify phase icon stays □ while ayahs are repeating, then switches to ■ for range repeats
+- Press skip forward/back - verify position counter updates and resets correctly
+- Verify after-repeat indicator shows when configured (e.g. "5a" for continue 5 ayahs)
+
+### After-Repeat Continuation (Both Modes)
+- Set "After repeating" to "5 ayahs" in either mode
+- Play a range and complete all repeats
+- Verify mini player shows the continuation indicator (arrow icon) with short label (e.g. "5a")
+- Play to completion and verify it continues to the next 5 ayahs as expected
+
+### Skip & Stop Button Fixes
+- During any playback, tap skip forward/back buttons
+- Verify the mini player mini player controls respond immediately (buttons should no longer be unresponsive)
+- Tap stop (X button) at any time - playback should stop and mini player should disappear
+- Start a new session immediately after stopping - verify you can override and start a different playback mode
