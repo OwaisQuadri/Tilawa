@@ -79,8 +79,7 @@ final class AyahOffsetService: @unchecked Sendable {
     private func loadFile(named name: String) -> [[Int?]]? {
         guard let url = Bundle.main.url(
             forResource: "ayah_offset_\(name)",
-            withExtension: "json",
-            subdirectory: "QuranData/ayah_offset_maps"
+            withExtension: "json"
         ) else { return nil }
 
         guard let data = try? Data(contentsOf: url),

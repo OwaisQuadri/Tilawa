@@ -10,6 +10,7 @@ most impact for the least work.
 | TIL-3 | [Bismillah Before Each Surah (Except Tawbah)](#til-3-bismillah-before-each-surah-except-tawbah) | Small |
 | TIL-4 | [Add Haptic Feedback](#til-4-add-haptic-feedback) | Small |
 | TIL-6 | [Fuzzy Search Ayah Text in Jump-to Menu](#til-6-fuzzy-search-ayah-text-in-jump-to-menu) | Medium |
+| TIL-7 | [Finalize Should Strip Audio Between Ayah Segments](#til-7-finalize-should-strip-audio-between-ayah-segments) | Moderate |
 | TIL-8 | [Displaying Masahif for Non-Hafs Riwayahs](#til-8-displaying-masahif-for-non-hafs-riwayahs) | Large |
 | TIL-9 | [Horizontal Two-Page Landscape Layout](#til-9-horizontal-two-page-landscape-layout) | Large |
 | TIL-10 | [Compatibility Rethink for Different-Ayah-Count Riwayahs](#til-10-compatibility-rethink-for-different-ayah-count-riwayahs) | Large |
@@ -25,7 +26,7 @@ themselves are safe to run in parallel.
 
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
-| A — Jump-to sheet | TIL-6 | `JumpToAyahSheet`, `JumpHistory` |
+| A — Jump-to sheet | TIL-6 | `JumpToAyahSheet`, `ArabicTextSearchService` |
 | B — Playback engine | TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
 | E — Riwayah data | TIL-10, TIL-20 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
@@ -236,6 +237,7 @@ decision on how admin auth works (separate API key, device-based, etc.).
 
 ---
 
+<<<<<<< HEAD
 ## TIL-20. Rule-Based Shatibiyyah Compatibility Engine
 
 **Problem**

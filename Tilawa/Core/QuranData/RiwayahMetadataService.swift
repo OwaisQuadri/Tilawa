@@ -79,8 +79,7 @@ final class RiwayahMetadataService: @unchecked Sendable {
     private func loadFile(named name: String) -> RiwayahMeta? {
         guard let url = Bundle.main.url(
             forResource: "riwayah_metadata_\(name)",
-            withExtension: "json",
-            subdirectory: "QuranData/riwayah_metadata"
+            withExtension: "json"
         ) else { return nil }
 
         guard let data = try? Data(contentsOf: url),
