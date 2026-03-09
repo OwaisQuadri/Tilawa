@@ -10,12 +10,12 @@ final class MushafPageUIView: UIView {
     // MARK: - Public Configuration
 
     var pageLayout: QULPageLayout? { didSet { if pageLayout?.page != oldValue?.page { rebuildLayout() } } }
-    var pageFont: CTFont? { didSet { rebuildLayout() } }
-    var highlightedWord: WordLocation? { didSet { setNeedsDisplay() } }
-    var highlightedAyah: AyahRef? { didSet { setNeedsDisplay() } }
-    var highlightedAyahEnd: AyahRef? { didSet { setNeedsDisplay() } }
-    var theme: MushafTheme = .standard { didSet { setNeedsDisplay() } }
-    var centeredPage: Bool = false { didSet { rebuildLayout() } }
+    var pageFont: CTFont? { didSet { if !fontsEqual(oldValue, pageFont) { rebuildLayout() } } }
+    var highlightedWord: WordLocation? { didSet { if highlightedWord != oldValue { setNeedsDisplay() } } }
+    var highlightedAyah: AyahRef? { didSet { if highlightedAyah != oldValue { setNeedsDisplay() } } }
+    var highlightedAyahEnd: AyahRef? { didSet { if highlightedAyahEnd != oldValue { setNeedsDisplay() } } }
+    var theme: MushafTheme = .standard { didSet { if theme != oldValue { setNeedsDisplay() } } }
+    var centeredPage: Bool = false { didSet { if centeredPage != oldValue { rebuildLayout() } } }
     var onWordTapped: ((WordLocation) -> Void)?
 
     // MARK: - Types
@@ -62,6 +62,17 @@ final class MushafPageUIView: UIView {
         let rect: CGRect
         let word: QULWord
     }
+
+    private static func fontsEqual(_ a: CTFont?, _ b: CTFont?) -> Bool {
+        switch (a, b) {
+        case (nil, nil): return true
+        case (nil, _), (_, nil): return false
+        case let (a?, b?):
+            return CTFontGetSize(a) == CTFontGetSize(b)
+                && CTFontCopyFullName(a) as String == CTFontCopyFullName(b) as String
+        }
+    }
+    private func fontsEqual(_ a: CTFont?, _ b: CTFont?) -> Bool { Self.fontsEqual(a, b) }
 
     private var lineLayouts: [LineLayout] = []
     private var lastLayoutBounds: CGRect = .zero

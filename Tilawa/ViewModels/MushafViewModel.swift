@@ -15,9 +15,7 @@ final class MushafViewModel {
 
     // MARK: - Page State
 
-    var currentPage: Int = 1 {
-        didSet { UserDefaults.standard.set(currentPage, forKey: Keys.currentPage) }
-    }
+    var currentPage: Int = 1
     var showJumpSheet: Bool = false
     var currentPageAyahRange: (first: AyahRef, last: AyahRef)? = nil
 
@@ -181,6 +179,11 @@ final class MushafViewModel {
         currentPage = page
         pageChangeTask?.cancel()
         pageChangeTask = Task {
+            guard !Task.isCancelled else { return }
+
+            // Persist page after swipe settles (task not cancelled by rapid swiping)
+            UserDefaults.standard.set(page, forKey: Keys.currentPage)
+
             let layoutRange = max(1, page - 5)...min(604, page + 5)
             let fontRange   = max(1, page - 15)...min(604, page + 15)
 
