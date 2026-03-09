@@ -8,6 +8,8 @@ struct AyahAssignmentView: View {
     let marker: AyahMarker
     /// The start ayah of the previous confirmed marker, used to seed smart defaults.
     let suggestedRef: AyahRef?
+    /// Ayah refs already assigned to other markers in this recording (for duplicate detection).
+    let existingAyahRefs: Set<AyahRef>
     let onAssign: (AyahRef?, AyahRef?) -> Void
     var onMarkerTypeChanged: ((AyahMarker.MarkerType) -> Void)?
     let onDelete: () -> Void
@@ -26,11 +28,13 @@ struct AyahAssignmentView: View {
 
     init(marker: AyahMarker,
          suggestedRef: AyahRef? = nil,
+         existingAyahRefs: Set<AyahRef> = [],
          onAssign: @escaping (AyahRef?, AyahRef?) -> Void,
          onMarkerTypeChanged: ((AyahMarker.MarkerType) -> Void)? = nil,
          onDelete: @escaping () -> Void) {
         self.marker = marker
         self.suggestedRef = suggestedRef
+        self.existingAyahRefs = existingAyahRefs
         self.onAssign = onAssign
         self.onMarkerTypeChanged = onMarkerTypeChanged
         self.onDelete = onDelete
@@ -125,6 +129,14 @@ struct AyahAssignmentView: View {
                                 Text(ayahLabel(surah: selectedSurah, ayah: selectedAyah))
                                     .foregroundStyle(selectedSurah == nil ? .tertiary : .secondary)
                             }
+                        }
+
+                        if let s = selectedSurah, let a = selectedAyah,
+                           existingAyahRefs.contains(AyahRef(surah: s, ayah: a)) {
+                            Label("This ayah has an earlier segment in this recording",
+                                  systemImage: "info.circle")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
                         }
 
                         if startAyahSelected {

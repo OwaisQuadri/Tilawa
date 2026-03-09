@@ -86,9 +86,13 @@ struct AnnotationEditorView: View {
                         guard let s = m.assignedSurah, let a = m.assignedAyah else { return nil }
                         return AyahRef(surah: s, ayah: a)
                     }
+                let existingRefs = Set(recordingMarkers
+                    .filter { $0.id != marker.id && $0.assignedSurah != nil && $0.assignedAyah != nil }
+                    .compactMap { AyahRef(surah: $0.assignedSurah!, ayah: $0.assignedAyah!) })
                 AyahAssignmentView(
                     marker: marker,
                     suggestedRef: prevRef,
+                    existingAyahRefs: existingRefs,
                     onAssign: { startRef, endRef in
                         vm.assignAyah(startRef, endRef: endRef, to: marker, context: context)
                     },
