@@ -3,7 +3,7 @@
 Deferred work, sorted by ROI (value ÷ effort). Items near the top deliver the
 most impact for the least work.
 
-**New ticket ID: TIL-20**
+**New ticket ID: TIL-21**
 
 | # | Task | Scope |
 |---|------|-------|
@@ -12,7 +12,6 @@ most impact for the least work.
 | TIL-4 | [Add Haptic Feedback](#til-4-add-haptic-feedback) | Small |
 | TIL-5 | [Re-enable Warsh/Qaloon in Riwayah Compat Builder](#til-5-re-enable-warshqaloon-in-riwayah-compat-builder) | Small |
 | TIL-6 | [Fuzzy Search Ayah Text in Jump-to Menu](#til-6-fuzzy-search-ayah-text-in-jump-to-menu) | Medium |
-| TIL-7 | [Finalize Should Strip Audio Between Ayah Segments](#til-7-finalize-should-strip-audio-between-ayah-segments) | Moderate |
 | TIL-8 | [Displaying Masahif for Non-Hafs Riwayahs](#til-8-displaying-masahif-for-non-hafs-riwayahs) | Large |
 | TIL-9 | [Horizontal Two-Page Landscape Layout](#til-9-horizontal-two-page-landscape-layout) | Large |
 | TIL-10 | [Compatibility Rethink for Different-Ayah-Count Riwayahs](#til-10-compatibility-rethink-for-different-ayah-count-riwayahs) | Large |
@@ -30,7 +29,6 @@ themselves are safe to run in parallel.
 | A — Jump-to sheet | TIL-6 | `JumpToAyahSheet`, `JumpHistory` |
 | B — Playback engine | TIL-2, TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
-| D — Recording pipeline | TIL-7 | Annotation editor, `SegmentAudioExtractor` |
 | E — Riwayah data | TIL-5, TIL-10 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
 | F — Mushaf rendering | TIL-8, TIL-9 | `MushafView`, `MushafPageView`, `MushafViewModel` |
 | G — Haptics (do last) | TIL-4 | Touches many views — best merged after other UI work |
@@ -135,27 +133,6 @@ remember a phrase but not its location have no way to jump there directly.
 
 **Scope**: Medium — needs Arabic text normalization, search logic, and a results
 list UI. No new data files required.
-
----
-
-## TIL-7. Finalize Should Strip Audio Between Ayah Segments
-
-**Problem**
-When finalizing a recording, the app preserves all audio between segments. If a
-recording has `1:1–1:7` from `0:00` to `0:30` and then `1:7` closes without a new
-ayah starting, with no marker until `19:1` at `0:45`, the gap from `0:30` to `0:45`
-is dead air. Finalize should strip/crop out such gaps so the exported audio contains
-only the marked ayah segments with no silence or unrecited audio between them.
-
-**What's needed**
-- During finalize, identify gaps between consecutive segments (where the end of one
-  segment is not immediately followed by the start of the next)
-- Use `AVAssetExportSession` to export only the marked time ranges, concatenating
-  them without the gaps
-- Preserve original audio quality and format
-
-**Scope**: Moderate — requires changes to the finalize/export pipeline to compose
-multiple time ranges into a single output file.
 
 ---
 
