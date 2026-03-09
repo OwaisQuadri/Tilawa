@@ -19,6 +19,7 @@ struct SurahDownloadSelectorView: View {
     @State private var isCheckingAvailability = false
     @State private var availabilityProgress: Double = 0
     @State private var showClearCacheConfirmation = false
+    @State private var cacheSize: Int64 = 0
 
     private let metadata = QuranMetadataService.shared
     private let dm = DownloadManager.shared
@@ -78,6 +79,37 @@ struct SurahDownloadSelectorView: View {
             }
 
             if !isCheckingAvailability {
+                // Cache status (moved from reciter row)
+                Section("Cache Status") {
+                    if let job = activeJob, !job.isDone {
+                        VStack(alignment: .leading, spacing: 6) {
+                            ProgressView(value: job.overall)
+                            Text(job.statusText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .monospacedDigit()
+                        }
+                        .padding(.vertical, 4)
+                    } else {
+                        let sizeLabel = cacheSize > 0 ? " · \(formattedBytes(cacheSize))" : ""
+                        let availableCount = availableSurahs.count
+                        let allAvailableCached = !cachedSurahs.isEmpty && cachedSurahs.count >= availableCount
+                        if cachedSurahs.isEmpty {
+                            Label("No surahs downloaded", systemImage: "arrow.down.circle")
+                                .font(.subheadline)
+                                .foregroundStyle(.orange)
+                        } else if allAvailableCached {
+                            Label("Fully cached\(sizeLabel)", systemImage: "checkmark.circle.fill")
+                                .font(.subheadline)
+                                .foregroundStyle(.green)
+                        } else {
+                            Label("\(cachedSurahs.count)/\(availableCount) surahs downloaded\(sizeLabel)", systemImage: "arrow.down.circle.dotted")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 // Summary
                 if !surahAvailability.isEmpty {
                     let totalAvailable = surahAvailability.values.reduce(0) { $0 + $1.available }
@@ -237,6 +269,7 @@ struct SurahDownloadSelectorView: View {
 
         // Check cache status after availability is known
         await refreshCachedSurahs(source: resolvedSource)
+        cacheSize = AudioFileCache.shared.cacheSize(for: reciter, source: resolvedSource)
     }
 
     private func runAvailabilityCheck(source: ReciterCDNSource) async {
@@ -323,6 +356,12 @@ struct SurahDownloadSelectorView: View {
             if allCached { cached.insert(surah) }
         }
         cachedSurahs = cached
+    }
+
+    private func formattedBytes(_ bytes: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: bytes)
     }
 }
 
