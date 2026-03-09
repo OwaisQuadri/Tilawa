@@ -1,0 +1,29 @@
+## TIL-6: Ayah Text Search in Jump Sheet
+
+**Latin Transliteration Search**
+1. Open Jump Sheet, type "bismillah"
+2. Verify 1:1 (Fatiha) appears near top of results (high relevance due to short ayah + full match)
+3. Verify match is bolded in Arabic snippet: بِسۡمِ ٱللَّهِ
+4. Type "alhamdu" → find 1:2
+5. Type "rabbi" → find multiple surahs starting with that word
+6. Type "alHamdu" (capital H) → verify case-insensitive; same results as "alhamdu"
+
+**Arabic Script Search**
+1. Type "الحمد" (Arabic) → find 1:2 and other matches
+2. Type "فبأي آلاء ربكما" → find repeated phrase in Surah Ar-Rahman (55:13, 55:16, etc.)
+3. Verify match is bolded, surrounding text is secondary color
+4. For long ayahs, verify text is truncated: "… [match] …" or "[match] …"
+
+**Recent Searches**
+1. Search "bismillah", tap result 1:1 → navigate
+2. Reopen Jump Sheet → before typing, verify "Recent Searches" section appears with "bismillah" as a chip
+3. Do 2–3 more searches (e.g. "rabbi", "alhamdu") → verify all appear as chips, newest first (limit 10)
+4. Tap a chip → search field fills with that query, results appear
+5. Tap "Clear" button → chips disappear
+
+**Edge Cases**
+1. Type "3" (representing ayn) → verify it matches عُ in words
+2. Type "'" (apostrophe) → verify it auto-converts to "3" for searching الع words
+3. Type query < 3 characters → verify no search results (only traditional jump modes work)
+4. Type exact match vs partial: "alhamdu" vs "hamdu" → both should find 1:2 and other matches
+5. Type typo "alhambu" (b instead of d) → should still find results due to fuzzy matching (1+ edit distance for 7-char query)
