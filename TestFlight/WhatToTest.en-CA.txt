@@ -1,3 +1,17 @@
+## Finalize Gap-Stripping (Rakaah Boundaries)
+
+### Annotation Editor — Gap Stripping in Salah Recordings
+- Record a salah session with two rak'ahs (or import a pre-recorded salah audio)
+- Open annotation editor, place markers:
+  - Marker 1 (0:00): start 112:1
+  - Marker 2 (0:10): end 112:4 (this closes the first rak'ah)
+  - Marker 3 (0:30): start 1:1 (start second rak'ah after the lull)
+- Press Finalize
+- Verify the output audio contains only the two recitation segments (0-10s and 30-40s) with the lull gap stripped
+- The finalized duration should be ~20s, not ~40s
+
+---
+
 ## Multiple Segments for Same Ayah
 
 ### Annotation Editor — Duplicate Markers
