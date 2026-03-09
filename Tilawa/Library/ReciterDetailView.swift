@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import AVFoundation
 
 // MARK: - Data model
 
@@ -13,6 +14,60 @@ private struct ReciterSourceItem: Identifiable {
     let kind: ReciterSourceKind
     let segments: [RecordingSegment]   // populated for .recording, empty for CDN
     var explicitOrder: Int?
+    var occurrence: Int?               // nil = unique range, 1/2/3… = Nth duplicate range
+}
+
+// MARK: - Lightweight preview player (scoped to this screen)
+
+@Observable
+@MainActor
+private final class SegmentPreviewPlayer {
+    var playingItemId: String?
+
+    private var audioPlayer: AVAudioPlayer?
+    private var timer: Timer?
+    private var endTime: Double?
+
+    func play(recording: Recording, segments: [RecordingSegment], itemId: String) {
+        stop()
+        guard let path = recording.storagePath else { return }
+        let url = AudioImporter.recordingsDirectory.appendingPathComponent(path)
+        guard FileManager.default.fileExists(atPath: url.path) else { return }
+
+        let sortedSegs = segments.sorted { ($0.startOffsetSeconds ?? 0) < ($1.startOffsetSeconds ?? 0) }
+        let startTime = sortedSegs.first?.startOffsetSeconds ?? 0
+        let endTimeVal = sortedSegs.last?.endOffsetSeconds ?? recording.safeDuration
+
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default)
+            try AVAudioSession.sharedInstance().setActive(true)
+            audioPlayer = try AVAudioPlayer(contentsOf: url)
+            audioPlayer?.currentTime = startTime
+            audioPlayer?.prepareToPlay()
+            audioPlayer?.play()
+            playingItemId = itemId
+            endTime = endTimeVal
+
+            timer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    guard let self, let player = self.audioPlayer else { return }
+                    let pastEnd = self.endTime.map { player.currentTime >= $0 } ?? false
+                    if !player.isPlaying || pastEnd { self.stop() }
+                }
+            }
+        } catch {
+            playingItemId = nil
+        }
+    }
+
+    func stop() {
+        audioPlayer?.stop()
+        audioPlayer = nil
+        timer?.invalidate()
+        timer = nil
+        endTime = nil
+        playingItemId = nil
+    }
 }
 
 // MARK: - View
@@ -23,20 +78,16 @@ struct ReciterDetailView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.dismiss) private var dismiss
-    @Environment(PlaybackViewModel.self) private var playbackVM
 
     @Query private var allSegments: [RecordingSegment]
 
     @State private var sources: [ReciterSourceItem] = []
-    @State private var savedSourceOrder: [String] = []
     @State private var showAddCDNSource = false
+    @State private var cacheSize: Int64 = 0
+    @State private var previewPlayer = SegmentPreviewPlayer()
 
     private var reciterSegments: [RecordingSegment] {
         allSegments.filter { $0.reciter?.id == reciter.id }
-    }
-
-    private var hasUnsavedChanges: Bool {
-        sources.map(\.id) != savedSourceOrder
     }
 
     var body: some View {
@@ -73,6 +124,7 @@ struct ReciterDetailView: View {
                     }
                     .onMove { from, to in
                         sources.move(fromOffsets: from, toOffset: to)
+                        saveOrder()
                     }
                 }
                 Button {
@@ -90,17 +142,9 @@ struct ReciterDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(reciter.safeName)
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("Save") { saveOrder() }
-                    .fontWeight(.semibold)
-                    .disabled(!hasUnsavedChanges)
-            }
-            ToolbarItem(placement: .navigationBarTrailing) {
-                EditButton()
-            }
-        }
         .onAppear { buildSources() }
+        .onDisappear { previewPlayer.stop() }
+        .task { cacheSize = await AudioFileCache.shared.cacheSize(for: reciter) }
         .onChange(of: reciterSegments.count) { _, _ in buildSources() }
         .sheet(isPresented: $showAddCDNSource, onDismiss: buildSources) {
             ManifestImportView(targetReciter: reciter)
@@ -113,7 +157,7 @@ struct ReciterDetailView: View {
     private func sourceRow(_ item: ReciterSourceItem) -> some View {
         switch item.kind {
         case .recording(let recording, let range):
-            recordingRow(recording: recording, range: range, segments: item.segments)
+            recordingRow(itemId: item.id, recording: recording, range: range, segments: item.segments, occurrence: item.occurrence)
         case .cdnSource(let source):
             NavigationLink {
                 SurahDownloadSelectorView(reciter: reciter, source: source)
@@ -145,7 +189,7 @@ struct ReciterDetailView: View {
         }
     }
 
-    private func recordingRow(recording: Recording, range: AyahRange, segments: [RecordingSegment]) -> some View {
+    private func recordingRow(itemId: String, recording: Recording, range: AyahRange, segments: [RecordingSegment], occurrence: Int? = nil) -> some View {
         let meta = QuranMetadataService.shared
         let start = range.start
         let end = range.end
@@ -166,12 +210,21 @@ struct ReciterDetailView: View {
         }
         let subtitle = subtitleParts.joined(separator: " · ")
 
-        let isPlaying = playbackVM.state.isActive
-            && (playbackVM.currentAyah.map { range.contains($0) } ?? false)
+        let isPlaying = previewPlayer.playingItemId == itemId
 
         return HStack {
             VStack(alignment: .leading, spacing: 2) {
-                Text(rangeLabel).font(.body)
+                HStack(spacing: 4) {
+                    Text(rangeLabel)
+                    if let occ = occurrence {
+                        Text("\(occ)")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 18, height: 18)
+                            .background(Color.secondary, in: Circle())
+                    }
+                }
+                .font(.body)
                 if !subtitle.isEmpty {
                     Text(subtitle)
                         .font(.caption)
@@ -181,9 +234,9 @@ struct ReciterDetailView: View {
             Spacer()
             Button {
                 if isPlaying {
-                    playbackVM.stop()
+                    previewPlayer.stop()
                 } else {
-                    Task { await playbackVM.playRecording(range: range, recording: recording) }
+                    previewPlayer.play(recording: recording, segments: segments, itemId: itemId)
                 }
             } label: {
                 Image(systemName: isPlaying ? "stop.circle.fill" : "play.circle.fill")
@@ -267,6 +320,20 @@ struct ReciterDetailView: View {
             ))
         }
 
+        // Detect duplicate-range recording items and assign occurrence numbers
+        var rangeKeys: [String: [Int]] = [:]  // key → indices of items with that range
+        for (i, item) in items.enumerated() {
+            if case .recording(let rec, let range) = item.kind {
+                let key = "\(rec.id?.uuidString ?? "")-\(range.start.surah)-\(range.start.ayah)-\(range.end.surah)-\(range.end.ayah)"
+                rangeKeys[key, default: []].append(i)
+            }
+        }
+        for (_, indices) in rangeKeys where indices.count > 1 {
+            for (occ, idx) in indices.enumerated() {
+                items[idx].occurrence = occ + 1
+            }
+        }
+
         items.sort { lhs, rhs in
             switch (lhs.explicitOrder, rhs.explicitOrder) {
             case let (.some(lo), .some(ro)) where lo != ro: return lo < ro
@@ -277,7 +344,6 @@ struct ReciterDetailView: View {
         }
 
         sources = items
-        savedSourceOrder = items.map(\.id)
     }
 
     private func tiebreakerIndex(_ item: ReciterSourceItem) -> Int {
@@ -326,6 +392,5 @@ struct ReciterDetailView: View {
             }
         }
         try? context.save()
-        savedSourceOrder = sources.map(\.id)
     }
 }

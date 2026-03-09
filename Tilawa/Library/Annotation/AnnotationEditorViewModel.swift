@@ -146,7 +146,7 @@ final class AnnotationEditorViewModel {
         //    assignedSurah/assignedAyah       = start ayah at this marker (new segment opens here)
         //    assignedEndSurah/assignedEndAyah = end ayah at this marker   (previous segment closes here)
         var pendingStart: (time: Double, surah: Int, ayah: Int, reciterID: UUID?, riwayah: String?)? = nil
-        var createdSegments = 0
+        var createdSegmentsList: [RecordingSegment] = []
 
         for marker in allSorted {
             let markerPos = marker.positionSeconds ?? 0
@@ -174,7 +174,7 @@ final class AnnotationEditorViewModel {
                 }
                 seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
                 context.insert(seg)
-                createdSegments += 1
+                createdSegmentsList.append(seg)
                 pendingStart = nil
             } else if !hasEnd, hasStart, let start = pendingStart,
                       let newSurah = marker.assignedSurah, let newAyah = marker.assignedAyah {
@@ -202,7 +202,7 @@ final class AnnotationEditorViewModel {
                 }
                 seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
                 context.insert(seg)
-                createdSegments += 1
+                createdSegmentsList.append(seg)
                 pendingStart = nil
             }
 
@@ -229,13 +229,24 @@ final class AnnotationEditorViewModel {
             }
             seg.riwayah = start.riwayah ?? Riwayah.hafs.rawValue
             context.insert(seg)
-            createdSegments += 1
+            createdSegmentsList.append(seg)
         }
 
-        // 4. Update annotation status
+        // 4. Assign userSortOrder for duplicate-ayah segments
+        let grouped = Dictionary(grouping: createdSegmentsList) { seg in
+            "\(seg.surahNumber ?? 0)-\(seg.ayahNumber ?? 0)-\(seg.riwayah ?? "")"
+        }
+        for (_, segs) in grouped where segs.count > 1 {
+            let sorted = segs.sorted { ($0.startOffsetSeconds ?? 0) < ($1.startOffsetSeconds ?? 0) }
+            for (i, seg) in sorted.enumerated() {
+                seg.userSortOrder = i
+            }
+        }
+
+        // 5. Update annotation status
         let totalMarkers = markers.count
         let confirmedCount = markers.filter { $0.isConfirmed == true }.count
-        if totalMarkers == 0 || createdSegments == 0 {
+        if totalMarkers == 0 || createdSegmentsList.isEmpty {
             recording.annotationStatus = AnnotationStatus.unannotated.rawValue
         } else if confirmedCount == totalMarkers {
             recording.annotationStatus = AnnotationStatus.complete.rawValue

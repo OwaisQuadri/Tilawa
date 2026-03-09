@@ -14,6 +14,29 @@ struct WaveformView: View {
 
     private let barWidth: CGFloat = 2.5
 
+    /// For each marker ID, returns (occurrenceNumber, totalCount) when the marker's ayah
+    /// appears more than once among confirmed ayah markers, ordered by position.
+    private var occurrenceMap: [UUID: (number: Int, total: Int)] {
+        let confirmed = markers
+            .filter { $0.isConfirmed == true && $0.resolvedMarkerType == .ayah && $0.assignedSurah != nil && $0.assignedAyah != nil }
+            .sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
+
+        // Group by AyahRef string key
+        var groups: [String: [UUID]] = [:]
+        for m in confirmed {
+            let key = "\(m.assignedSurah!)-\(m.assignedAyah!)"
+            groups[key, default: []].append(m.id ?? UUID())
+        }
+
+        var result: [UUID: (number: Int, total: Int)] = [:]
+        for (_, ids) in groups where ids.count > 1 {
+            for (i, id) in ids.enumerated() {
+                result[id] = (i + 1, ids.count)
+            }
+        }
+        return result
+    }
+
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
@@ -86,6 +109,12 @@ struct WaveformView: View {
                         .font(.system(size: 10, weight: .bold))
                     Image(systemName: "pencil")
                         .font(.system(size: 12, weight: .semibold))
+                    if let occ = marker.id.flatMap({ occurrenceMap[$0] }) {
+                        Text("\(occ.number)")
+                            .font(.system(size: 9, weight: .bold))
+                            .frame(width: 16, height: 16)
+                            .background(color.opacity(0.3), in: Circle())
+                    }
                 }
                 .foregroundStyle(color)
                 .padding(.horizontal, 6)
