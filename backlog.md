@@ -3,7 +3,7 @@
 Deferred work, sorted by ROI (value ÷ effort). Items near the top deliver the
 most impact for the least work.
 
-**New ticket ID: TIL-21**
+**Next available ticket ID: TIL-20**
 
 | # | Task | Scope |
 |---|------|-------|
