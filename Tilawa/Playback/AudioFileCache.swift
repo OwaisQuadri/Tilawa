@@ -152,6 +152,21 @@ actor AudioFileCache {
         }
     }
 
+    /// Returns total bytes cached for a specific CDN source.
+    func cacheSize(for reciter: Reciter, source: ReciterCDNSource) -> Int64 {
+        let meta = QuranMetadataService.shared
+        var total: Int64 = 0
+        for surah in 1...114 {
+            let count = meta.ayahCount(surah: surah)
+            for ayah in 1...max(1, count) {
+                let url = localFileURL(for: AyahRef(surah: surah, ayah: ayah), reciter: reciter, source: source)
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                total += Int64(size)
+            }
+        }
+        return total
+    }
+
     /// Returns total bytes used by a reciter's cache.
     func cacheSize(for reciter: Reciter) -> Int64 {
         let dir = cacheDirectory(for: reciter)

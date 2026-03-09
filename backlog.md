@@ -6,8 +6,6 @@ most impact for the least work.
 | # | Task | Scope |
 |---|------|-------|
 | 1 | [Fix Audio Hitching Between Ayahs and on Pause](#1-fix-audio-hitching-between-ayahs-and-on-pause) | Small |
-| 3 | [Jump-to Recents Should Persist Between Sessions](#3-jump-to-recents-should-persist-between-sessions) | Tiny |
-| 4 | [Move CDN Download Status to Manage CDN Screen](#4-move-cdn-download-status-to-manage-cdn-screen) | Small |
 | 5 | [Show Total Playback Time in Setup Sheet](#5-show-total-playback-time-in-setup-sheet) | Small |
 | 6 | [Bismillah Before Each Surah (Except Tawbah)](#6-bismillah-before-each-surah-except-tawbah) | Small |
 | 7 | [Add Haptic Feedback](#7-add-haptic-feedback) | Small |
@@ -29,9 +27,9 @@ themselves are safe to run in parallel.
 
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
-| A — Jump-to sheet | 3, 10 | `JumpToAyahSheet`, `JumpHistory` |
+| A — Jump-to sheet | 10 | `JumpToAyahSheet`, `JumpHistory` |
 | B — Playback engine | 1, 5, 6 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
-| C — CDN / Library UI | 4, 16 | `RecitersView`, `ReciterDetailView`, CDN views |
+| C — CDN / Library UI | 16 | `RecitersView`, `ReciterDetailView`, CDN views |
 | D — Recording pipeline | 8, 11 | Annotation editor, `SegmentAudioExtractor` |
 | E — Riwayah data | 9, 14 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
 | F — Mushaf rendering | 12, 13 | `MushafView`, `MushafPageView`, `MushafViewModel` |
@@ -62,24 +60,7 @@ the playback engine.
 
 ---
 
-## 3. Move CDN Download Status to Manage CDN Screen
-
-**Problem**
-The reciter list row currently shows CDN download status inline, cluttering the
-row with progress indicators and state that only matters when actively managing
-downloads.
-
-**What's needed**
-- Remove CDN download status indicators from the reciter row view
-- Add a top section in the Manage CDN screen showing overall download status
-  (progress, count of downloaded/total surahs, active downloads)
-- Keep the per-surah download state visible within the Manage CDN screen itself
-
-**Scope**: Small — move existing UI components from one view to another.
-
----
-
-## 4. Show Total Playback Time in Setup Sheet
+## 5. Show Total Playback Time in Setup Sheet
 
 **Problem**
 When configuring a playback session, there is no indication of how long it will
