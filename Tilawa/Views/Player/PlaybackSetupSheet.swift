@@ -28,6 +28,8 @@ struct PlaybackSetupSheet: View {
     @State private var endSurah:   Int = 1
     @State private var endAyah:    Int = 7
     @State private var isCheckingAvailability = false
+    @State private var estimatedDuration: TimeInterval?
+    @State private var estimateIsInfinite = false
 
     // Sliding window preset save/delete state
     @State private var showingSavePresetAlert = false
@@ -196,7 +198,7 @@ struct PlaybackSetupSheet: View {
     @ViewBuilder
     private var playbackSection: some View {
         if let s = settings {
-            Section("Playback") {
+            Section {
                 LabeledContent {
                     HStack {
                         Slider(value: speedBinding(s), in: 0.5...2.0, step: 0.25)
@@ -216,6 +218,13 @@ struct PlaybackSetupSheet: View {
                     Text("2 sec").tag(2000)
                     Text("3 sec").tag(3000)
                 }
+            } header: {
+                Text("Playback")
+            } footer: {
+                Text(estimatedTimeLabel)
+            }
+            .task(id: estimateInputs) {
+                await computeEstimatedDuration()
             }
         }
     }
@@ -1089,4 +1098,204 @@ struct PlaybackSetupSheet: View {
     }
 
     private func save() { try? context.save() }
+
+    // MARK: - Estimated duration
+
+    private var estimateInputs: EstimateInputs {
+        let s = settings
+        return EstimateInputs(
+            startSurah: startSurah, startAyah: startAyah,
+            endSurah: endSurah, endAyah: endAyah,
+            speed: s?.safeSpeed ?? 1.0,
+            gapMs: s?.safeGapMs ?? 0,
+            ayahRepeat: s?.safeAyahRepeat ?? 1,
+            rangeRepeat: s?.safeRangeRepeat ?? 1,
+            slidingWindow: s?.safeSlidingWindowEnabled ?? false,
+            swA: s?.safeSWPerAyahRepeats ?? 5,
+            swB: s?.safeSWConnectionRepeats ?? 3,
+            swC: s?.safeSWConnectionWindow ?? 2,
+            swD: s?.safeSWFullRangeRepeats ?? 10,
+            reciterId: s?.selectedReciterId,
+            riwayah: s?.safeRiwayah ?? .hafs
+        )
+    }
+
+    private var estimatedTimeLabel: String {
+        if estimateIsInfinite { return "Estimated time: ∞" }
+        guard let duration = estimatedDuration else { return " " }
+        return "Estimated time: ~\(formatDuration(duration))"
+    }
+
+    private func computeEstimatedDuration() async {
+        guard let s = settings else { return }
+
+        let ayahRepeat = s.safeAyahRepeat
+        let rangeRepeat = s.safeRangeRepeat
+        let isSW = s.safeSlidingWindowEnabled
+
+        // Infinite check
+        if !isSW && (ayahRepeat == -1 || rangeRepeat == -1) {
+            estimateIsInfinite = true
+            estimatedDuration = nil
+            return
+        }
+        estimateIsInfinite = false
+
+        let speed = s.safeSpeed
+        let gapSeconds = Double(s.safeGapMs) / 1000.0
+
+        // Build ayah list
+        var ayahs: [AyahRef] = []
+        var cursor = AyahRef(surah: startSurah, ayah: startAyah)
+        let end = AyahRef(surah: endSurah, ayah: endAyah)
+        while cursor <= end {
+            ayahs.append(cursor)
+            guard let next = nextAyah(after: cursor) else { break }
+            cursor = next
+        }
+        guard !ayahs.isEmpty else {
+            estimatedDuration = nil
+            return
+        }
+
+        // Resolve durations
+        let durations = await loadAyahDurations(ayahs: ayahs, settings: s)
+        let n = durations.count
+        guard n > 0 else { estimatedDuration = nil; return }
+
+        try? Task.checkCancellation()
+
+        let totalDuration: TimeInterval
+        if isSW {
+            let swA = s.safeSWPerAyahRepeats
+            let swB = s.safeSWConnectionRepeats
+            let swC = s.safeSWConnectionWindow
+            let swD = s.safeSWFullRangeRepeats
+            let fullRangeSum = durations.reduce(0, +)
+
+            var soloTime = 0.0
+            for d in durations { soloTime += d * Double(swA) }
+
+            var connectionTime = 0.0
+            for i in 1..<n {
+                let windowStart = max(0, i - swC)
+                let windowSum = durations[windowStart...i].reduce(0, +)
+                connectionTime += windowSum * Double(swB)
+            }
+
+            let fullTime = fullRangeSum * Double(swD)
+            totalDuration = (soloTime + connectionTime + fullTime) / speed
+        } else {
+            let sumDurations = durations.reduce(0, +)
+            let perPassAudio = sumDurations * Double(ayahRepeat)
+            let perPassGaps = Double(n * ayahRepeat - 1) * gapSeconds
+            let onePass = (perPassAudio + perPassGaps) / speed
+            totalDuration = onePass * Double(rangeRepeat)
+        }
+
+        estimatedDuration = totalDuration
+    }
+
+    private func loadAyahDurations(ayahs: [AyahRef], settings s: PlaybackSettings) async -> [Double] {
+        let fallbackDuration = 6.0
+        let riwayah = s.safeRiwayah
+        let cache = AudioFileCache.shared
+
+        // Determine the effective reciter
+        let reciter: Reciter?
+        if let id = s.selectedReciterId {
+            reciter = allReciters.first { $0.id == id }
+        } else {
+            reciter = enabledMatchingReciters(riwayah: riwayah, settings: s).first
+        }
+        guard let reciter else { return ayahs.map { _ in fallbackDuration } }
+
+        // For CDN reciters, find the best matching source
+        let cdnSource: ReciterCDNSource? = (reciter.cdnSources ?? []).first { $0.safeRiwayah == riwayah }
+            ?? (reciter.cdnSources ?? []).first
+
+        // Pre-compute local file URLs on the main actor (SwiftData models aren't Sendable)
+        var cdnFileURLs: [AyahRef: URL] = [:]
+        if let source = cdnSource {
+            for ref in ayahs {
+                let url = await cache.localFileURL(for: ref, reciter: reciter, source: source)
+                if FileManager.default.fileExists(atPath: url.path) {
+                    cdnFileURLs[ref] = url
+                }
+            }
+        }
+
+        // For local recordings, build a lookup of segment durations (no file I/O needed)
+        var segmentDurations: [AyahRef: Double] = [:]
+        if reciter.hasPersonalRecordings {
+            for seg in reciter.segments ?? [] {
+                guard seg.safeRiwayah == riwayah || RiwayahCompatibilityService.shared
+                    .everCompatible(with: riwayah).contains(seg.safeRiwayah) else { continue }
+                let ref = seg.primaryAyahRef
+                let endRef = seg.endAyahRef
+                let dur = seg.safeDuration
+                guard dur > 0 else { continue }
+                // For multi-ayah segments, distribute duration evenly
+                var count = 0
+                var cur = ref
+                while cur <= endRef {
+                    count += 1
+                    guard let next = nextAyah(after: cur) else { break }
+                    cur = next
+                }
+                let perAyah = dur / Double(max(1, count))
+                cur = ref
+                while cur <= endRef {
+                    segmentDurations[cur] = perAyah
+                    guard let next = nextAyah(after: cur) else { break }
+                    cur = next
+                }
+            }
+        }
+
+        // Load durations in parallel — only plain values (URLs, Doubles) cross into tasks
+        return await withTaskGroup(of: (Int, Double).self, returning: [Double].self) { group in
+            for (index, ref) in ayahs.enumerated() {
+                let segDur = segmentDurations[ref]
+                let fileURL = cdnFileURLs[ref]
+                group.addTask {
+                    // Prefer local segment duration (no I/O needed)
+                    if let dur = segDur, dur > 0 { return (index, dur) }
+                    // Load duration from cached CDN file
+                    if let url = fileURL,
+                       let dur = await cache.audioDuration(url: url), dur > 0 {
+                        return (index, dur)
+                    }
+                    return (index, fallbackDuration)
+                }
+            }
+            var results = [Double](repeating: fallbackDuration, count: ayahs.count)
+            for await (index, duration) in group {
+                results[index] = duration
+            }
+            return results
+        }
+    }
+
+    private func formatDuration(_ seconds: TimeInterval) -> String {
+        let totalSeconds = Int(seconds.rounded())
+        let hours = totalSeconds / 3600
+        let minutes = (totalSeconds % 3600) / 60
+        let secs = totalSeconds % 60
+        if hours > 0 {
+            return minutes > 0 ? "\(hours)h \(minutes)m" : "\(hours)h"
+        } else if minutes > 0 {
+            return secs > 0 ? "\(minutes)m \(secs)s" : "\(minutes)m"
+        } else {
+            return "\(secs)s"
+        }
+    }
+}
+
+private struct EstimateInputs: Equatable, Hashable {
+    let startSurah: Int, startAyah: Int, endSurah: Int, endAyah: Int
+    let speed: Double, gapMs: Int, ayahRepeat: Int, rangeRepeat: Int
+    let slidingWindow: Bool, swA: Int, swB: Int, swC: Int, swD: Int
+    let reciterId: UUID?
+    let riwayah: Riwayah
 }
