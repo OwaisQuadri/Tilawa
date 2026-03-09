@@ -78,8 +78,7 @@ final class RiwayahTextService: @unchecked Sendable {
     private func loadFile(named name: String) -> [[String]]? {
         guard let url = Bundle.main.url(
             forResource: "riwayah_text_\(name)",
-            withExtension: "json",
-            subdirectory: "QuranData/riwayah_text"
+            withExtension: "json"
         ) else { return nil }
 
         guard let data = try? Data(contentsOf: url),

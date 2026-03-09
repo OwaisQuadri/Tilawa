@@ -18,6 +18,7 @@ struct JumpToAyahSheet: View {
     @AppStorage("jumpSheet.tab") private var selectedTab: JumpTab = .position
     @State private var searchText: String = ""
     @AppStorage("jumpSheet.bookmarkSort") private var bookmarkSort: BookmarkSort = .newest
+    @AppStorage("jumpSheet.recentSearches") private var recentSearchesData: Data = Data()
 
     @Query(sort: \UserBookmark.createdAt, order: .reverse)
     private var bookmarks: [UserBookmark]
@@ -41,6 +42,26 @@ struct JumpToAyahSheet: View {
         case newest = "Newest"
         case oldest = "Oldest"
         case position = "Position"
+    }
+
+    // MARK: - Recent Searches
+
+    private var recentSearches: [String] {
+        (try? JSONDecoder().decode([String].self, from: recentSearchesData)) ?? []
+    }
+
+    private func recordRecentSearch(_ query: String) {
+        let trimmed = query.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return }
+        var searches = recentSearches
+        searches.removeAll { $0 == trimmed }
+        searches.insert(trimmed, at: 0)
+        if searches.count > 10 { searches = Array(searches.prefix(10)) }
+        recentSearchesData = (try? JSONEncoder().encode(searches)) ?? Data()
+    }
+
+    private func clearRecentSearches() {
+        recentSearchesData = Data()
     }
 
     // MARK: - Jump Helpers
@@ -120,6 +141,9 @@ struct JumpToAyahSheet: View {
                 if !searchText.isEmpty {
                     searchResultsList
                 } else {
+                    if !recentSearches.isEmpty {
+                        recentSearchesList
+                    }
                     Picker("", selection: $selectedTab) {
                         ForEach(JumpTab.allCases, id: \.self) { tab in
                             Text(tab.rawValue).tag(tab)
@@ -364,12 +388,14 @@ struct JumpToAyahSheet: View {
         case page(Int)
         case juz(Int, startPage: Int)
         case surahAyah(surah: Int, ayah: Int, label: String)
+        case ayahText(surah: Int, ayah: Int, label: String, hit: ArabicTextSearchService.SearchHit)
 
         var id: String {
             switch self {
             case .page(let p): return "p-\(p)"
             case .juz(let j, _): return "j-\(j)"
             case .surahAyah(let s, let a, _): return "sa-\(s)-\(a)"
+            case .ayahText(let s, let a, _, _): return "at-\(s)-\(a)"
             }
         }
     }
@@ -460,6 +486,23 @@ struct JumpToAyahSheet: View {
             }
         }
 
+        // Ayah text search — works with both Arabic and Latin (transliteration) input
+        if trimmed.count >= 3 {
+            let hits = ArabicTextSearchService.shared.search(trimmed)
+            for hit in hits {
+                let s = hit.ayahRef.surah
+                let a = hit.ayahRef.ayah
+                let id = "at-\(s)-\(a)"
+                if !results.contains(where: { $0.id == id }) {
+                    let label = "\(metadata.surahName(s)) \(s):\(a)"
+                    results.append(.ayahText(
+                        surah: s, ayah: a,
+                        label: label, hit: hit
+                    ))
+                }
+            }
+        }
+
         return results
     }
 
@@ -491,6 +534,9 @@ struct JumpToAyahSheet: View {
                 switch result {
                 case .surahAyah(let s, let a, _):
                     recordAndJump(surah: s, ayah: a)
+                case .ayahText(let s, let a, _, _):
+                    recordRecentSearch(searchText)
+                    recordAndJump(surah: s, ayah: a)
                 case .page(let p):
                     recordAndJumpToPage(p)
                 case .juz(_, let startPage):
@@ -500,6 +546,19 @@ struct JumpToAyahSheet: View {
                 switch result {
                 case .surahAyah(_, _, let label):
                     Label(label, systemImage: "book")
+                case .ayahText(_, _, let label, let hit):
+                    VStack(alignment: .leading) {
+                        Label(label, systemImage: "text.magnifyingglass")
+                        (Text(hit.before).foregroundStyle(.secondary)
+                         + Text(hit.match).bold()
+                         + Text(hit.after).foregroundStyle(.secondary))
+                            .font(.caption)
+                            .lineLimit(1)
+                            .environment(\.layoutDirection, .rightToLeft)
+                            .multilineTextAlignment(.leading)
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .frame(maxWidth: .infinity)
                 case .page(let p):
                     Label("Page \(p)", systemImage: "doc")
                 case .juz(let j, _):
@@ -508,6 +567,41 @@ struct JumpToAyahSheet: View {
             }
         }
         .listStyle(.plain)
+    }
+
+    private var recentSearchesList: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack {
+                Text("Recent Searches")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("Clear") { clearRecentSearches() }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(recentSearches, id: \.self) { query in
+                        Button {
+                            searchText = query
+                        } label: {
+                            Text(query)
+                                .font(.subheadline)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(.regularMaterial, in: Capsule())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 6)
+            }
+        }
     }
 
     // MARK: - Recents Tab

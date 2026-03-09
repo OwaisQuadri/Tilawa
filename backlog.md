@@ -3,18 +3,19 @@
 Deferred work, sorted by ROI (value ÷ effort). Items near the top deliver the
 most impact for the least work.
 
-**Next available ticket ID: TIL-21**
+**Next available ticket ID: TIL-22**
 
 | # | Task | Scope |
 |---|------|-------|
 | TIL-3 | [Bismillah Before Each Surah (Except Tawbah)](#til-3-bismillah-before-each-surah-except-tawbah) | Small |
 | TIL-4 | [Add Haptic Feedback](#til-4-add-haptic-feedback) | Small |
-| TIL-6 | [Fuzzy Search Ayah Text in Jump-to Menu](#til-6-fuzzy-search-ayah-text-in-jump-to-menu) | Medium |
+| TIL-7 | [Finalize Should Strip Audio Between Ayah Segments](#til-7-finalize-should-strip-audio-between-ayah-segments) | Moderate |
 | TIL-8 | [Displaying Masahif for Non-Hafs Riwayahs](#til-8-displaying-masahif-for-non-hafs-riwayahs) | Large |
 | TIL-9 | [Horizontal Two-Page Landscape Layout](#til-9-horizontal-two-page-landscape-layout) | Large |
 | TIL-10 | [Compatibility Rethink for Different-Ayah-Count Riwayahs](#til-10-compatibility-rethink-for-different-ayah-count-riwayahs) | Large |
 | TIL-11 | [Auto-Segment Recordings via Quran Detection](#til-11-auto-segment-recordings-via-quran-detection) | Very Large |
 | TIL-12 | [Reciter CDN Import Rework + Admin Review System](#til-12-reciter-cdn-import-rework--admin-review-system) | Large |
+| TIL-21 | [Similar Verses Discovery](#til-21-similar-verses-discovery) | Medium |
 | TIL-20 | [Rule-Based Shatibiyyah Compatibility Engine](#til-20-rule-based-shatibiyyah-compatibility-engine) | Large |
 
 ### Parallel work groups
@@ -25,7 +26,7 @@ themselves are safe to run in parallel.
 
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
-| A — Jump-to sheet | TIL-6 | `JumpToAyahSheet`, `JumpHistory` |
+| A — Jump-to sheet | TIL-21 | `JumpToAyahSheet`, `ArabicTextSearchService` |
 | B — Playback engine | TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
 | E — Riwayah data | TIL-10, TIL-20 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
@@ -70,27 +71,6 @@ controls, marker placement, and navigation feel flat without haptics.
 
 **Scope**: Small — sprinkle `UIFeedbackGenerator` calls at existing interaction
 points. No architectural changes.
-
----
-
-## TIL-6. Fuzzy Search Ayah Text in Jump-to Menu
-
-**Problem**
-The jump sheet supports numeric queries (`10:5`, `p 100`, `juz 2`) and fuzzy
-surah-name matching, but you can't search by ayah text itself. Users who
-remember a phrase but not its location have no way to jump there directly.
-
-**What's needed**
-- Add an Arabic text search mode to `JumpToAyahSheet`
-- Search against the Hafs text corpus (already available via
-  `RiwayahTextService` or bundled JSON)
-- Use fuzzy/substring matching tolerant of tashkeel (diacritics) — match on
-  stripped consonantal skeleton, display full text in results
-- Show a scrollable results list with (surah:ayah, snippet) rows; tapping a
-  result jumps to that page
-
-**Scope**: Medium — needs Arabic text normalization, search logic, and a results
-list UI. No new data files required.
 
 ---
 
@@ -266,3 +246,23 @@ TIL-5 must be done first (provides the base compatibility draft).
 **Scope**: Large — requires scholarly input to catalog and encode the rules,
 plus careful validation. The usul are finite and systematic; the farsh are
 numerous but well-documented in traditional sources.
+
+---
+
+## TIL-21. Similar Verses Discovery
+
+**Problem**
+Many ayahs in the Quran share similar phrasing. Users studying or memorizing
+often want to find related verses but have no way to discover them from the
+current page.
+
+**What's needed**
+- A "Similar Verses" feature accessible from the ayah context or search results
+- Compare ayah text using the existing `ArabicTextSearchService` stripped index
+  (consonantal skeleton similarity)
+- Rank by text overlap (e.g. longest common substring or edit distance on
+  stripped text)
+- Present results in a sheet or inline list with snippets and navigation
+
+**Scope**: Medium — builds on the search index from TIL-6. Needs a similarity
+algorithm and UI, but no new data sources.
