@@ -1,3 +1,15 @@
+## Jump-to Recents Persistence
+
+- Open the Mushaf
+- Tap the Jump-to button at the top
+- Click on a Recent entry (or navigate to any ayah to create a new one)
+- Force-quit the app (swipe up in app switcher)
+- Relaunch the app
+- Tap Jump-to again and check the Recents tab
+- Verify your recent jump appears in the list (not lost after force-quit)
+
+---
+
 ## Sliding Window & Mini Player Indicators
 
 ### Sliding Window Mode
