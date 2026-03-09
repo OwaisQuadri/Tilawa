@@ -48,6 +48,7 @@ struct JumpToAyahSheet: View {
     private func recordAndJump(surah: Int, ayah: Int) {
         let page = metadata.page(for: AyahRef(surah: surah, ayah: ayah))
         modelContext.insert(JumpHistory(surah: surah, ayah: ayah, page: page))
+        try? modelContext.save()
         mushafVM.jumpTo(surah: surah, ayah: ayah)
     }
 
@@ -58,6 +59,7 @@ struct JumpToAyahSheet: View {
             ayah: 1,
             page: page
         ))
+        try? modelContext.save()
         mushafVM.jumpToPage(page)
     }
 
