@@ -47,6 +47,14 @@ final class PlaybackSettings {
     @Relationship(deleteRule: .cascade)
     var segmentOverrides: [ReciterSegmentOverride]?
 
+    // --- Sliding Window ---
+    var slidingWindowEnabled: Bool?
+    var slidingWindowPreset: String?          // unused, kept for migration compat
+    var slidingWindowPerAyahRepeats: Int?     // A
+    var slidingWindowConnectionRepeats: Int?  // B
+    var slidingWindowConnectionWindow: Int?   // C
+    var slidingWindowFullRangeRepeats: Int?   // D
+
     // --- Display ---
     var showRepetitionCounter: Bool?
     var showReciterName: Bool?
@@ -100,6 +108,12 @@ final class PlaybackSettings {
     var safeRangeRepeatBehavior: RangeRepeatBehavior {
         RangeRepeatBehavior(rawValue: rangeRepeatBehavior ?? "") ?? .whileRepeatingAyahs
     }
+    var safeSlidingWindowEnabled: Bool { slidingWindowEnabled ?? false }
+    var safeSWPerAyahRepeats: Int { slidingWindowPerAyahRepeats ?? 5 }
+    var safeSWConnectionRepeats: Int { slidingWindowConnectionRepeats ?? 3 }
+    var safeSWConnectionWindow: Int { slidingWindowConnectionWindow ?? 2 }
+    var safeSWFullRangeRepeats: Int { slidingWindowFullRangeRepeats ?? 10 }
+
     var sortedReciterPriority: [ReciterPriorityEntry] {
         (reciterPriority ?? [])
             .filter { $0.isEnabled ?? true }

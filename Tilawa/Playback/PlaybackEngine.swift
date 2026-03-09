@@ -19,6 +19,18 @@ final class PlaybackEngine {
     private(set) var currentSpeed: Double = 1.0
     /// The full range for the active playback session, if any.
     var activeRange: AyahRange? { activeSnapshot?.range }
+    /// The configured after-repeat action for the active session.
+    var afterRepeatAction: AfterRepeatAction { activeSnapshot?.afterRepeatAction ?? .stop }
+    /// Display label for the after-repeat configuration (e.g. "5 ayahs", "1 page").
+    var afterRepeatLabel: String? { activeSnapshot?.afterRepeatLabel }
+    /// Short display label for the after-repeat configuration (e.g. "5a", "1pg").
+    var afterRepeatShortLabel: String? { activeSnapshot?.afterRepeatShortLabel }
+    /// The resolved after-repeat option for the active session.
+    var afterRepeatOption: AfterRepeatOption { activeSnapshot.map { .from($0) } ?? .disabled }
+    /// Current position in the ayah queue (0-based).
+    var queueIndex: Int { currentQueueIndex }
+    /// Total number of ayahs in the current playback queue.
+    var queueCount: Int { ayahQueue.count }
 
     // MARK: - AVAudio Graph
 
@@ -195,6 +207,7 @@ final class PlaybackEngine {
         if nextIndex < ayahQueue.count {
             // Next ayah exists in this pass — jump immediately (no inter-ayah gap)
             currentQueueIndex = nextIndex
+            currentAyahRepetition = 0   // Reset so scheduleCurrentAyah initializes to 1
             await scheduleCurrentAyah()
         } else {
             // End of queue — honour range-repeat / afterRepeat / stop (same as natural completion)
@@ -208,7 +221,10 @@ final class PlaybackEngine {
         sessionID = UUID()   // Invalidate any in-flight completion callback
         playerNode.stop()
         // On first ayah: restart it. Otherwise: go to start of the previous ayah.
-        if currentQueueIndex > 0 { currentQueueIndex -= 1 }
+        if currentQueueIndex > 0 {
+            currentQueueIndex -= 1
+            currentAyahRepetition = 0   // Reset so scheduleCurrentAyah initializes to 1
+        }
         await scheduleCurrentAyah()
     }
 

@@ -13,6 +13,7 @@ struct PlaybackSetupSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     @Query private var allPlaybackSettings: [PlaybackSettings]
+    @Query(sort: \SlidingWindowPreset.order) private var userPresets: [SlidingWindowPreset]
     @Query private var allReciters: [Reciter]
     private var settings: PlaybackSettings? { allPlaybackSettings.first }
 
@@ -27,6 +28,11 @@ struct PlaybackSetupSheet: View {
     @State private var endSurah:   Int = 1
     @State private var endAyah:    Int = 7
     @State private var isCheckingAvailability = false
+
+    // Sliding window preset save/delete state
+    @State private var showingSavePresetAlert = false
+    @State private var newPresetName = ""
+    @State private var presetToDelete: SlidingWindowPreset?
 
     // MARK: - Body
 
@@ -220,37 +226,158 @@ struct PlaybackSetupSheet: View {
     private var repeatSection: some View {
         if let s = settings {
             Section("Repeat") {
-                Picker("Each verse", selection: ayahRepeatBinding(s)) {
-                    ForEach(repeatOptions, id: \.tag) { opt in
-                        Text(opt.label).tag(opt.tag)
-                    }
+                Picker("Mode", selection: slidingWindowEnabledBinding(s)) {
+                    Text("Standard").tag(false)
+                    Text("Sliding Window").tag(true)
                 }
 
-                Picker("Range", selection: rangeRepeatBinding(s)) {
-                    ForEach(repeatOptions, id: \.tag) { opt in
-                        Text(opt.label).tag(opt.tag)
-                    }
-                }
+                if s.safeSlidingWindowEnabled {
+                    // Sliding window preset chips
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            Button("Default") {
+                                applySWSettings(.default, to: s)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            .tint(currentSWSettings(s) == .default ? .accentColor : nil)
 
-                if showRangeRepeatBehavior(s) {
-                    Picker("Verse repeats", selection: rangeRepeatBehaviorBinding(s)) {
-                        Text("Every range pass").tag(RangeRepeatBehavior.whileRepeatingAyahs)
-                        Text("First pass only").tag(RangeRepeatBehavior.afterRepeatingAyahs)
+                            ForEach(userPresets) { preset in
+                                Button {
+                                    applySWSettings(preset.settings, to: s)
+                                } label: {
+                                    HStack(spacing: 4) {
+                                        Text(preset.safeName)
+                                        Button {
+                                            presetToDelete = preset
+                                        } label: {
+                                            Image(systemName: "xmark")
+                                                .font(.caption2.weight(.bold))
+                                                .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                                .tint(preset.matches(currentSWSettings(s)) ? .accentColor : nil)
+                            }
+
+                            Button {
+                                newPresetName = ""
+                                showingSavePresetAlert = true
+                            } label: {
+                                Image(systemName: "plus")
+                                    .font(.caption.weight(.semibold))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    .listRowInsets(.init(top: 8, leading: 16, bottom: 8, trailing: 16))
+
+                    Picker("Solo repeats", selection: swPerAyahBinding(s)) {
+                        ForEach(1...20, id: \.self) { n in Text("\(n)×").tag(n) }
+                    }
+                    Picker("Connection repeats", selection: swConnectionRepeatsBinding(s)) {
+                        ForEach(1...10, id: \.self) { n in Text("\(n)×").tag(n) }
+                    }
+                    Picker("Connection ayahs", selection: swConnectionWindowBinding(s)) {
+                        ForEach(1...10, id: \.self) { n in Text("\(n)").tag(n) }
+                    }
+                    Picker("Full range repeats", selection: swFullRangeBinding(s)) {
+                        ForEach(1...30, id: \.self) { n in Text("\(n)×").tag(n) }
+                    }
+
+                    Text(slidingWindowSummary(s))
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Each verse", selection: ayahRepeatBinding(s)) {
+                        ForEach(repeatOptions, id: \.tag) { opt in
+                            Text(opt.label).tag(opt.tag)
+                        }
+                    }
+
+                    Picker("Range", selection: rangeRepeatBinding(s)) {
+                        ForEach(repeatOptions, id: \.tag) { opt in
+                            Text(opt.label).tag(opt.tag)
+                        }
+                    }
+
+                    if showRangeRepeatBehavior(s) {
+                        Picker("Verse repeats", selection: rangeRepeatBehaviorBinding(s)) {
+                            Text("Every range pass").tag(RangeRepeatBehavior.whileRepeatingAyahs)
+                            Text("First pass only").tag(RangeRepeatBehavior.afterRepeatingAyahs)
+                        }
                     }
                 }
 
                 if showAfterRepeat(s) {
                     Picker("After repeating", selection: afterRepeatBinding(s)) {
-                        Text("Disabled").tag(0)
-                        Text("3 ayaat").tag(3)
-                        Text("5 ayaat").tag(5)
-                        Text("10 ayaat").tag(10)
-                        Text("1 page").tag(-100)
-                        Text("page +1").tag(-101)
+                        ForEach(AfterRepeatOption.allCases) { option in
+                            Text(option.label).tag(option)
+                        }
+                    }
+                }
+            }
+            .alert("Save Preset", isPresented: $showingSavePresetAlert) {
+                TextField("Preset name", text: $newPresetName)
+                Button("Save") { saveCurrentAsPreset(s) }
+                Button("Cancel", role: .cancel) {}
+            }
+            .confirmationDialog("Delete Preset?",
+                                isPresented: Binding(
+                                    get: { presetToDelete != nil },
+                                    set: { if !$0 { presetToDelete = nil } }
+                                ),
+                                titleVisibility: .visible) {
+                if let preset = presetToDelete {
+                    Button("Delete \"\(preset.safeName)\"", role: .destructive) {
+                        context.delete(preset)
+                        save()
+                        presetToDelete = nil
                     }
                 }
             }
         }
+    }
+
+    private func currentSWSettings(_ s: PlaybackSettings) -> SlidingWindowSettings {
+        SlidingWindowSettings(
+            perAyahRepeats: s.safeSWPerAyahRepeats,
+            connectionRepeats: s.safeSWConnectionRepeats,
+            connectionWindowSize: s.safeSWConnectionWindow,
+            fullRangeRepeats: s.safeSWFullRangeRepeats
+        )
+    }
+
+    private func applySWSettings(_ sw: SlidingWindowSettings, to s: PlaybackSettings) {
+        s.slidingWindowPerAyahRepeats = sw.perAyahRepeats
+        s.slidingWindowConnectionRepeats = sw.connectionRepeats
+        s.slidingWindowConnectionWindow = sw.connectionWindowSize
+        s.slidingWindowFullRangeRepeats = sw.fullRangeRepeats
+        save()
+    }
+
+    private func saveCurrentAsPreset(_ s: PlaybackSettings) {
+        let name = newPresetName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return }
+        let preset = SlidingWindowPreset.make(
+            name: name,
+            settings: currentSWSettings(s),
+            order: userPresets.count
+        )
+        context.insert(preset)
+        save()
+    }
+
+    private func slidingWindowSummary(_ s: PlaybackSettings) -> String {
+        let a = s.safeSWPerAyahRepeats
+        let b = s.safeSWConnectionRepeats
+        let c = s.safeSWConnectionWindow
+        let d = s.safeSWFullRangeRepeats
+        return "Each ayah \(a)x solo, then \(b)x with \(c) preceding, then \(d)x full range"
     }
 
     // MARK: - Presets
@@ -274,7 +401,7 @@ struct PlaybackSetupSheet: View {
         if let pageRange = mushafVM.currentPageAyahRange,
            let nextAyah = metadata.ayah(after: pageRange.last) {
             result.append(Preset(
-                label: "pg \(page) +1",
+                label: "pg \(page) +1a",
                 range: AyahRange(start: pageRange.first, end: nextAyah)
             ))
         }
@@ -810,10 +937,6 @@ struct PlaybackSetupSheet: View {
 
     private func startPlayback() {
         guard let s = settings else { return }
-        // If "After Repeating" is hidden, the user can't change it — force it to disabled.
-        if !showAfterRepeat(s) {
-            s.afterRepeatAction = AfterRepeatAction.stop.rawValue
-        }
         let range = AyahRange(
             start: AyahRef(surah: startSurah, ayah: startAyah),
             end:   AyahRef(surah: endSurah,   ayah: endAyah)
@@ -824,9 +947,21 @@ struct PlaybackSetupSheet: View {
         let coveredAyahs = coveredAyahsForPlayback(settings: s)
         let capturedPlayback = playback
         let capturedContext  = context
+        let isSlidingWindow = s.safeSlidingWindowEnabled
         dismiss()
-        Task { await capturedPlayback.play(range: range, settings: s, context: capturedContext,
-                                           coveredAyahs: coveredAyahs) }
+
+        if isSlidingWindow {
+            Task { await capturedPlayback.playSlidingWindow(range: range, settings: s,
+                                                            context: capturedContext,
+                                                            coveredAyahs: coveredAyahs) }
+        } else {
+            // If "After Repeating" is hidden, the user can't change it — force it to disabled.
+            if !showAfterRepeat(s) {
+                s.afterRepeatAction = AfterRepeatAction.stop.rawValue
+            }
+            Task { await capturedPlayback.play(range: range, settings: s, context: capturedContext,
+                                               coveredAyahs: coveredAyahs) }
+        }
     }
 
     /// Expands all segment ranges for the active local-only reciter selection into a flat set
@@ -926,38 +1061,31 @@ struct PlaybackSetupSheet: View {
         s.safeAyahRepeat != 1 && s.safeRangeRepeat != 1
     }
 
-    /// Encodes afterRepeatAction + count into a single Int tag for the picker.
-    /// 0 = stop, 3/5/10 = continueAyaat with that count, -100 = continuePages(1), -101 = continuePages(1)+extraAyah
-    private func afterRepeatBinding(_ s: PlaybackSettings) -> Binding<Int> {
+    private func afterRepeatBinding(_ s: PlaybackSettings) -> Binding<AfterRepeatOption> {
         Binding(
-            get: {
-                switch s.safeAfterRepeatAction {
-                case .stop:           return 0
-                case .continueAyaat:  return s.afterRepeatContinueAyaatCount ?? 3
-                case .continuePages:  return (s.afterRepeatContinuePagesExtraAyah == true) ? -101 : -100
-                }
-            },
-            set: { tag in
-                switch tag {
-                case 0:
-                    s.afterRepeatAction = AfterRepeatAction.stop.rawValue
-                    s.afterRepeatContinuePagesExtraAyah = false
-                case -100:
-                    s.afterRepeatAction = AfterRepeatAction.continuePages.rawValue
-                    s.afterRepeatContinuePagesCount = 1
-                    s.afterRepeatContinuePagesExtraAyah = false
-                case -101:
-                    s.afterRepeatAction = AfterRepeatAction.continuePages.rawValue
-                    s.afterRepeatContinuePagesCount = 1
-                    s.afterRepeatContinuePagesExtraAyah = true
-                default:
-                    s.afterRepeatAction = AfterRepeatAction.continueAyaat.rawValue
-                    s.afterRepeatContinueAyaatCount = tag
-                    s.afterRepeatContinuePagesExtraAyah = false
-                }
-                save()
-            }
+            get: { .from(s) },
+            set: { $0.apply(to: s); save() }
         )
+    }
+
+    private func slidingWindowEnabledBinding(_ s: PlaybackSettings) -> Binding<Bool> {
+        Binding(get: { s.safeSlidingWindowEnabled }, set: { s.slidingWindowEnabled = $0; save() })
+    }
+
+    private func swPerAyahBinding(_ s: PlaybackSettings) -> Binding<Int> {
+        Binding(get: { s.safeSWPerAyahRepeats }, set: { s.slidingWindowPerAyahRepeats = $0; save() })
+    }
+
+    private func swConnectionRepeatsBinding(_ s: PlaybackSettings) -> Binding<Int> {
+        Binding(get: { s.safeSWConnectionRepeats }, set: { s.slidingWindowConnectionRepeats = $0; save() })
+    }
+
+    private func swConnectionWindowBinding(_ s: PlaybackSettings) -> Binding<Int> {
+        Binding(get: { s.safeSWConnectionWindow }, set: { s.slidingWindowConnectionWindow = $0; save() })
+    }
+
+    private func swFullRangeBinding(_ s: PlaybackSettings) -> Binding<Int> {
+        Binding(get: { s.safeSWFullRangeRepeats }, set: { s.slidingWindowFullRangeRepeats = $0; save() })
     }
 
     private func save() { try? context.save() }

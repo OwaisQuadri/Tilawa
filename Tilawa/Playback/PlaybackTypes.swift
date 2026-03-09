@@ -43,6 +43,14 @@ struct PlaybackSettingsSnapshot: Sendable {
     let coveredAyahs: Set<AyahRef>?
 }
 
+extension PlaybackSettingsSnapshot {
+    private var afterRepeatOption: AfterRepeatOption { .from(self) }
+    /// Label describing the after-repeat continuation config.
+    var afterRepeatLabel: String? { afterRepeatOption.label == "Disabled" ? nil : afterRepeatOption.label }
+    /// Short label describing the after-repeat continuation config.
+    var afterRepeatShortLabel: String? { afterRepeatOption.shortLabel }
+}
+
 /// Snapshot of one priority entry (resolved Reciter object at capture time).
 struct ReciterSnapshot: Sendable {
     let reciterId: UUID
@@ -53,6 +61,22 @@ struct ReciterSnapshot: Sendable {
 struct SegmentOverrideSnapshot: Sendable {
     let range: AyahRange
     let reciterPriority: [ReciterSnapshot]
+}
+
+// MARK: - Sliding Window
+
+/// Settings for the sliding window memorization mode.
+struct SlidingWindowSettings: Sendable, Equatable {
+    let perAyahRepeats: Int         // A — solo ayah repeats (default 5)
+    let connectionRepeats: Int      // B — connection range repeats (default 3)
+    let connectionWindowSize: Int   // C — preceding ayahs in connection (default 2)
+    let fullRangeRepeats: Int       // D — full range repeats at end (default 10)
+}
+
+extension SlidingWindowSettings {
+    /// Default sliding window configuration.
+    static let `default` = SlidingWindowSettings(perAyahRepeats: 5, connectionRepeats: 3,
+                                                  connectionWindowSize: 2, fullRangeRepeats: 10)
 }
 
 // MARK: - Word timing (retained for future use, not used by engine in this version)

@@ -8,6 +8,7 @@ import SwiftData
 final class PlaybackViewModel {
 
     let engine: PlaybackEngine
+    let slidingWindow: SlidingWindowCoordinator
     private let metadata: QuranMetadataService
 
     // MARK: - Forwarded state (convenience accessors)
@@ -21,8 +22,15 @@ final class PlaybackViewModel {
     var currentRangeRepetition: Int { engine.currentRangeRepetition }
     var totalRangeRepetitions: Int { engine.totalRangeRepetitions }
     var isPlaying: Bool { engine.state == .playing }
+    var isPlayingOrLoading: Bool { engine.state == .playing || engine.state == .loading }
     var unavailableAyah: AyahRef? { engine.unavailableAyah }
     var activeRange: AyahRange? { engine.activeRange }
+    var afterRepeatAction: AfterRepeatAction { engine.afterRepeatAction }
+    var afterRepeatLabel: String? { engine.afterRepeatLabel }
+    var afterRepeatShortLabel: String? { engine.afterRepeatShortLabel }
+    var afterRepeatOption: AfterRepeatOption { engine.afterRepeatOption }
+    var queueIndex: Int { engine.queueIndex }
+    var queueCount: Int { engine.queueCount }
 
     // MARK: - Derived display properties
 
@@ -43,6 +51,7 @@ final class PlaybackViewModel {
 
     init(engine: PlaybackEngine, metadata: QuranMetadataService = .shared) {
         self.engine = engine
+        self.slidingWindow = SlidingWindowCoordinator(engine: engine, metadata: metadata)
         self.metadata = metadata
     }
 
@@ -55,6 +64,7 @@ final class PlaybackViewModel {
               settings: PlaybackSettings,
               context: ModelContext,
               coveredAyahs: Set<AyahRef>? = nil) async {
+        slidingWindow.stop()  // Cancel any active sliding window session
         let snapshot = buildSnapshot(range: range, settings: settings, context: context,
                                      coveredAyahs: coveredAyahs)
         await engine.play(range: range, settings: snapshot)
@@ -63,6 +73,7 @@ final class PlaybackViewModel {
     /// Plays a recording's ayah range with no repeats and stop-after behavior.
     /// Does NOT modify the user's persisted PlaybackSettings.
     func playRecording(range: AyahRange, recording: Recording) async {
+        slidingWindow.stop()  // Cancel any active sliding window session
         let reciters = recording.reciters
         guard !reciters.isEmpty else { return }
         let snapshot = PlaybackSettingsSnapshot(
@@ -105,31 +116,39 @@ final class PlaybackViewModel {
         return covered.isEmpty ? nil : covered
     }
 
+    /// Starts a sliding window memorization session.
+    func playSlidingWindow(range: AyahRange,
+                           settings: PlaybackSettings,
+                           context: ModelContext,
+                           coveredAyahs: Set<AyahRef>? = nil) async {
+        let baseSnapshot = buildSnapshot(range: range, settings: settings, context: context,
+                                          coveredAyahs: coveredAyahs)
+        let swSettings = SlidingWindowSettings(
+            perAyahRepeats: settings.safeSWPerAyahRepeats,
+            connectionRepeats: settings.safeSWConnectionRepeats,
+            connectionWindowSize: settings.safeSWConnectionWindow,
+            fullRangeRepeats: settings.safeSWFullRangeRepeats
+        )
+        await slidingWindow.start(range: range, baseSettings: baseSnapshot, swSettings: swSettings)
+    }
+
     func pause()  { engine.pause() }
     func resume() { engine.resume() }
-    func stop()   { engine.stop() }
+
+    func stop() {
+        slidingWindow.stop()
+        engine.stop()
+    }
+
     func setSpeed(_ speed: Double) { engine.setSpeed(speed) }
     func seek(to ayah: AyahRef) async { await engine.seek(to: ayah) }
-    func skipToNextAyah() async { await engine.skipToNextAyah() }
-    func skipToPreviousAyah() async { await engine.skipToPreviousAyah() }
 
-    // MARK: - Repetition display
-
-    var ayahRepetitionLabel: String? {
-        guard totalAyahRepetitions != 1 else { return nil }
-        if totalAyahRepetitions == -1 { return "Ayah ∞" }
-        return "Ayah \(currentAyahRepetition)/\(totalAyahRepetitions)"
+    func skipToNextAyah() async {
+        await engine.skipToNextAyah()
     }
 
-    var rangeRepetitionLabel: String? {
-        guard totalRangeRepetitions != 1 else { return nil }
-        if totalRangeRepetitions == -1 { return "Range ∞" }
-        return "Range \(currentRangeRepetition)/\(totalRangeRepetitions)"
-    }
-
-    var repetitionLabel: String? {
-        let parts = [ayahRepetitionLabel, rangeRepetitionLabel].compactMap { $0 }
-        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    func skipToPreviousAyah() async {
+        await engine.skipToPreviousAyah()
     }
 
     // MARK: - Private

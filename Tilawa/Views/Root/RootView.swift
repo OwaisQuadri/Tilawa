@@ -32,16 +32,20 @@ struct RootView: View {
 private struct MiniPlayerInset: ViewModifier {
     @Environment(PlaybackViewModel.self) private var playbackVM
 
+    private var showMiniPlayer: Bool {
+        playbackVM.state.isActive || playbackVM.slidingWindow.isActive
+    }
+
     func body(content: Content) -> some View {
         content.safeAreaInset(edge: .bottom) {
-            if playbackVM.state.isActive {
+            if showMiniPlayer {
                 MiniPlayerBar()
                     .padding(.horizontal, 8)
                     .padding(.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .animation(.spring(duration: 0.3), value: playbackVM.state.isActive)
+        .animation(.spring(duration: 0.3), value: showMiniPlayer)
     }
 }
 

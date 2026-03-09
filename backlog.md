@@ -122,40 +122,12 @@ multiple time ranges into a single output file.
 
 ---
 
-## 7. Sliding Window Range/Repeat Mode
+## 7. ~~Sliding Window Range/Repeat Mode~~ ✅
 
-**Problem**
-Memorization workflows follow a structured pattern: repeat a single ayah N
-times, then connect it with preceding ayahs, then advance — but the current
-repeat modes don't automate this. Users must manually adjust ranges and repeat
-counts as they progress through a page.
-
-**What's needed**
-
-### Playback behaviour
-Given a target memorization range (e.g. one page), the sliding-window mode
-works as follows:
-1. Play ayah *i* alone, repeat it **A** times (default 5)
-2. Play a connection range: ayah *i* plus the **C** ayahs before it
-   (default 2 preceding ayahs), repeat this range **B** times (default 3)
-3. Advance *i* by 1 and repeat steps 1–2 until the end of the target range
-4. Play the entire target range, repeat it **D** times (default 10)
-
-### Settings & persistence
-- Parameters **A** (per-ayah repeats), **B** (connection repeats),
-  **C** (connection window size), and **D** (full-range repeats) are
-  user-configurable and persist via `@AppStorage`
-- Add presets for common repeat-count combinations (similar to existing range
-  presets) — e.g. "Light review" (3/2/1/5), "Deep memorization" (10/5/3/15)
-- Presets are user-editable and persistable
-
-### UI
-- New mode option in the range/repeat picker (alongside existing modes)
-- Compact summary showing current step (e.g. "Ayah 3 of 7 — connection pass")
-- Progress indicator for the overall memorization session
-
-**Scope**: Large — new playback state machine, settings UI, preset management,
-and integration with `PlaybackEngine`/`PlaybackQueue`.
+Implemented. The sliding window coordinator orchestrates solo → connection →
+full range phases above the PlaybackEngine. Settings UI with presets, icon-based
+phase/repetition indicators in the mini player, and "after repeating"
+continuation support are all in place.
 
 ---
 
