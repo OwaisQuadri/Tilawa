@@ -1,11 +1,14 @@
-## Finalize Gap-Stripping (Rakaah Boundaries)
+## Playback Setup Sheet — Estimated Time Display
 
-### Annotation Editor — Gap Stripping in Salah Recordings
-- Record a salah session with two rak'ahs (or import a pre-recorded salah audio)
-- Open annotation editor, place markers:
-  - Marker 1 (0:00): start 112:1
-  - Marker 2 (0:10): end 112:4 (this closes the first rak'ah)
-  - Marker 3 (0:30): start 1:1 (start second rak'ah after the lull)
-- Press Finalize
-- Verify the output audio contains only the two recitation segments (0-10s and 30-40s) with the lull gap stripped
-- The finalized duration should be ~20s, not ~40s
+### Estimated Playback Time Footer
+- Open the Play sheet and verify "Estimated time: ~X" appears in the Playback section footer
+- Change the range (From/To ayah) → estimate updates live
+- Adjust speed slider (0.5× to 2.0×) → estimate changes inversely
+- Increase ayah repeat count → estimate scales proportionally
+- Increase range repeat count → estimate multiplies accordingly
+- Change gap between ayaat → estimate increases
+- Toggle sliding window mode → estimate recalculates with solo/connection/full-range phases
+- Adjust sliding window parameters (A/B/C/D) → estimate updates
+- Set a repeat count to ∞ → shows "∞" instead of a time
+- Verify with both CDN reciters (cached and uncached files) and local recordings
+

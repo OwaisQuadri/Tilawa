@@ -7,7 +7,6 @@ most impact for the least work.
 
 | # | Task | Scope |
 |---|------|-------|
-| TIL-2 | [Show Total Playback Time in Setup Sheet](#til-2-show-total-playback-time-in-setup-sheet) | Small |
 | TIL-3 | [Bismillah Before Each Surah (Except Tawbah)](#til-3-bismillah-before-each-surah-except-tawbah) | Small |
 | TIL-4 | [Add Haptic Feedback](#til-4-add-haptic-feedback) | Small |
 | TIL-5 | [Re-enable Warsh/Qaloon in Riwayah Compat Builder](#til-5-re-enable-warshqaloon-in-riwayah-compat-builder) | Small |
@@ -27,34 +26,12 @@ themselves are safe to run in parallel.
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
 | A — Jump-to sheet | TIL-6 | `JumpToAyahSheet`, `JumpHistory` |
-| B — Playback engine | TIL-2, TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
+| B — Playback engine | TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
 | E — Riwayah data | TIL-5, TIL-10 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
 | F — Mushaf rendering | TIL-8, TIL-9 | `MushafView`, `MushafPageView`, `MushafViewModel` |
 | G — Haptics (do last) | TIL-4 | Touches many views — best merged after other UI work |
 | H — ML / R&D | TIL-11 | Mostly new files, independent |
-
----
-
-## TIL-2. Show Total Playback Time in Setup Sheet
-
-**Problem**
-When configuring a playback session, there is no indication of how long it will
-take. Users picking a full juz with 10× repeats have no idea if that's a
-20-minute or 3-hour commitment until they press play.
-
-**What's needed**
-- Compute an estimated total playback time based on the selected range, repeat
-  settings, speed, and gap between ayaat
-- Display the estimate in the `PlaybackSetupSheet` Form (e.g. below the repeat
-  section or near the Play button): "Estimated time: ~1h 23m"
-- For CDN reciters, duration per ayah can be fetched from cached audio metadata
-  or estimated from average ayah length; for local recordings, use actual
-  segment durations
-- Update the estimate live as the user changes range, repeats, or speed
-
-**Scope**: Small — compute a sum from existing duration data and display it.
-No new models or services needed.
 
 ---
 
