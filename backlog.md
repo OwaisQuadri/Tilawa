@@ -3,9 +3,88 @@
 Deferred work, sorted by ROI (value ÷ effort). Items near the top deliver the
 most impact for the least work.
 
+| # | Task | Scope |
+|---|------|-------|
+| 1 | [Fix Audio Hitching Between Ayahs and on Pause](#1-fix-audio-hitching-between-ayahs-and-on-pause) | Small |
+| 2 | [Fix Page-Swipe UI Glitches](#2-fix-page-swipe-ui-glitches) | Small |
+| 3 | [Jump-to Recents Should Persist Between Sessions](#3-jump-to-recents-should-persist-between-sessions) | Tiny |
+| 4 | [Move CDN Download Status to Manage CDN Screen](#4-move-cdn-download-status-to-manage-cdn-screen) | Small |
+| 5 | [Show Total Playback Time in Setup Sheet](#5-show-total-playback-time-in-setup-sheet) | Small |
+| 6 | [Bismillah Before Each Surah (Except Tawbah)](#6-bismillah-before-each-surah-except-tawbah) | Small |
+| 7 | [Add Haptic Feedback](#7-add-haptic-feedback) | Small |
+| 8 | [Multiple Segments From the Same Recording for the Same Ayah](#8-multiple-segments-from-the-same-recording-for-the-same-ayah) | Medium |
+| 9 | [Re-enable Warsh/Qaloon in Riwayah Compat Builder](#9-re-enable-warshqaloon-in-riwayah-compat-builder) | Small |
+| 10 | [Fuzzy Search Ayah Text in Jump-to Menu](#10-fuzzy-search-ayah-text-in-jump-to-menu) | Medium |
+| 11 | [Finalize Should Strip Audio Between Ayah Segments](#11-finalize-should-strip-audio-between-ayah-segments) | Moderate |
+| 12 | [Displaying Masahif for Non-Hafs Riwayahs](#12-displaying-masahif-for-non-hafs-riwayahs) | Large |
+| 13 | [Horizontal Two-Page Landscape Layout](#13-horizontal-two-page-landscape-layout) | Large |
+| 14 | [Compatibility Rethink for Different-Ayah-Count Riwayahs](#14-compatibility-rethink-for-different-ayah-count-riwayahs) | Large |
+| 15 | [Auto-Segment Recordings via Quran Detection](#15-auto-segment-recordings-via-quran-detection) | Very Large |
+| 16 | [Reciter CDN Import Rework + Admin Review System](#16-reciter-cdn-import-rework--admin-review-system) | Large |
+
+### Parallel work groups
+
+Tasks grouped by file-overlap so each group can run on its own branch with
+minimal merge conflicts. Work any **one task per group** at a time; groups
+themselves are safe to run in parallel.
+
+| Group | Tasks | Key files touched |
+|-------|-------|-------------------|
+| A — Jump-to sheet | 3, 10 | `JumpToAyahSheet`, `JumpHistory` |
+| B — Playback engine | 1, 5, 6 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
+| C — CDN / Library UI | 4, 16 | `RecitersView`, `ReciterDetailView`, CDN views |
+| D — Recording pipeline | 8, 11 | Annotation editor, `SegmentAudioExtractor` |
+| E — Riwayah data | 9, 14 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
+| F — Mushaf rendering | 2, 12, 13 | `MushafView`, `MushafPageView`, `MushafViewModel` |
+| G — Haptics (do last) | 7 | Touches many views — best merged after other UI work |
+| H — ML / R&D | 15 | Mostly new files, independent |
+
 ---
 
-## 1. Jump-to Recents Should Persist Between Sessions
+## 1. Fix Audio Hitching Between Ayahs and on Pause
+
+**Problem**
+Audio playback stutters or hitches during transitions between ayahs and when
+the user pauses. This breaks the listening flow and is especially jarring during
+memorization sessions where smooth, gapless playback is expected.
+
+**What's needed**
+- Profile the playback pipeline (`PlaybackEngine` / `PlaybackQueue`) to identify
+  the source of stuttering — likely caused by synchronous file loading, decoder
+  setup, or main-thread blocking during transitions
+- Pre-buffer the next ayah's audio while the current one is still playing so
+  transitions are gapless
+- Ensure pause/resume does not cause an audible glitch (e.g. fade out/in or
+  proper AVAudioPlayer stop handling)
+- Test with both CDN-streamed and local audio sources
+
+**Scope**: Small–Medium — performance investigation + buffer/prefetch fixes in
+the playback engine.
+
+---
+
+## 2. Fix Page-Swipe UI Glitches
+
+**Problem**
+Swiping between mushaf pages sometimes produces visual glitches — pages may
+flicker, jump, or render incompletely during the swipe gesture. This makes
+navigation feel unreliable.
+
+**What's needed**
+- Investigate the `MushafView` / `MushafPageRepresentable` / `MushafPageUIView`
+  swipe handling for frame-drop or layout issues
+- Ensure pages are pre-rendered before they enter the viewport (off-screen
+  preparation)
+- Check for unnecessary view re-renders triggered by `@Observable` state
+  changes during the swipe gesture
+- Profile with Instruments (Core Animation / Hangs) to pinpoint dropped frames
+
+**Scope**: Small–Medium — UI performance debugging and optimization in the
+mushaf rendering pipeline.
+
+---
+
+## 3. Jump-to Recents Should Persist Between Sessions
 
 **Problem**
 The Recents tab in the jump-to sheet loses its history when the app is
@@ -23,7 +102,7 @@ them each session.
 
 ---
 
-## 2. Move CDN Download Status to Manage CDN Screen
+## 4. Move CDN Download Status to Manage CDN Screen
 
 **Problem**
 The reciter list row currently shows CDN download status inline, cluttering the
@@ -40,7 +119,67 @@ downloads.
 
 ---
 
-## 3. Multiple Segments From the Same Recording for the Same Ayah
+## 5. Show Total Playback Time in Setup Sheet
+
+**Problem**
+When configuring a playback session, there is no indication of how long it will
+take. Users picking a full juz with 10× repeats have no idea if that's a
+20-minute or 3-hour commitment until they press play.
+
+**What's needed**
+- Compute an estimated total playback time based on the selected range, repeat
+  settings, speed, and gap between ayaat
+- Display the estimate in the `PlaybackSetupSheet` Form (e.g. below the repeat
+  section or near the Play button): "Estimated time: ~1h 23m"
+- For CDN reciters, duration per ayah can be fetched from cached audio metadata
+  or estimated from average ayah length; for local recordings, use actual
+  segment durations
+- Update the estimate live as the user changes range, repeats, or speed
+
+**Scope**: Small — compute a sum from existing duration data and display it.
+No new models or services needed.
+
+---
+
+## 6. Bismillah Before Each Surah (Except Tawbah)
+
+**Problem**
+When playing a surah from the beginning, there is no Bismillah recited before it.
+Most masahif and traditional recitations include the Bismillah before every surah
+except At-Tawbah (Surah 9), which begins without one.
+
+**What's needed**
+- Before playing the first ayah of any surah (except Surah 9), automatically
+  prepend the Bismillah audio
+- Source the Bismillah audio from the reciter's Fatiha (1:1) segment — this
+  avoids needing a separate Bismillah file per reciter
+- Make this behaviour toggleable in playback settings (default: on)
+
+**Scope**: Small — playback queue insertion logic + a setting toggle. No new
+audio files needed.
+
+---
+
+## 7. Add Haptic Feedback
+
+**Problem**
+The app has no tactile feedback. Interactions like page turns, playback
+controls, marker placement, and navigation feel flat without haptics.
+
+**What's needed**
+- Add `UIImpactFeedbackGenerator` / `UISelectionFeedbackGenerator` haptics to
+  key interactions: page swipes, play/pause, ayah marker placement, picker
+  selections, and destructive confirmations
+- Use appropriate feedback styles (light for selections, medium for actions,
+  heavy/notification for errors or completions)
+- Make haptics toggleable in settings (default: on)
+
+**Scope**: Small — sprinkle `UIFeedbackGenerator` calls at existing interaction
+points. No architectural changes.
+
+---
+
+## 8. Multiple Segments From the Same Recording for the Same Ayah
 
 **Problem**
 A salah recording may contain Fatiha recited multiple times (once per rak'ah).
@@ -61,7 +200,7 @@ model already supports competing segments with priority ordering
 
 ---
 
-## 4. Re-enable Warsh/Qaloon in Riwayah Compat Builder
+## 9. Re-enable Warsh/Qaloon in Riwayah Compat Builder
 
 **Problem**
 `Scripts/riwayah_compat_builder.py` currently skips Warsh and Qaloon because
@@ -80,7 +219,7 @@ comparing (surah, ayah) positions across riwayat directly gives wrong pairings
 
 ---
 
-## 5. Fuzzy Search Ayah Text in Jump-to Menu
+## 10. Fuzzy Search Ayah Text in Jump-to Menu
 
 **Problem**
 The jump sheet supports numeric queries (`10:5`, `p 100`, `juz 2`) and fuzzy
@@ -101,7 +240,7 @@ list UI. No new data files required.
 
 ---
 
-## 6. Finalize Should Strip Audio Between Ayah Segments
+## 11. Finalize Should Strip Audio Between Ayah Segments
 
 **Problem**
 When finalizing a recording, the app preserves all audio between segments. If a
@@ -122,16 +261,7 @@ multiple time ranges into a single output file.
 
 ---
 
-## 7. ~~Sliding Window Range/Repeat Mode~~ ✅
-
-Implemented. The sliding window coordinator orchestrates solo → connection →
-full range phases above the PlaybackEngine. Settings UI with presets, icon-based
-phase/repetition indicators in the mini player, and "after repeating"
-continuation support are all in place.
-
----
-
-## 8. Displaying Masahif for Non-Hafs Riwayahs
+## 12. Displaying Masahif for Non-Hafs Riwayahs
 
 **Problem**
 The app currently renders the Hafs mushaf text for all sessions. If a user
@@ -147,12 +277,34 @@ may differ at variant positions.
   Hafs internal positions and native Warsh/Qaloon ayah numbers
 
 **Dependency**
-Task 4 is done. Requires a decision on the Unicode rendering approach before
+Task 9 is done. Requires a decision on the Unicode rendering approach before
 Swift model changes.
 
 ---
 
-## 9. Compatibility Rethink for Different-Ayah-Count Riwayahs
+## 13. Horizontal Two-Page Landscape Layout
+
+**Problem**
+In landscape orientation the app still shows a single mushaf page, wasting half
+the screen. Traditional mushaf reading uses a two-page spread, and e-readers
+like Kindle already offer this experience.
+
+**What's needed**
+- Detect landscape orientation and display two consecutive mushaf pages
+  side-by-side (right-to-left: odd page on the right, even on the left)
+- Swipe interaction should animate as a page flip (similar to Kindle's page-turn
+  effect) rather than a simple scroll
+- Ensure highlighting, navigation, and playback tracking work correctly across
+  the two-page spread
+- Graceful fallback to single-page on smaller screens (iPhone landscape) where
+  two pages would be too cramped
+
+**Scope**: Large — mushaf layout engine changes, custom page-flip gesture and
+animation, and two-page state synchronization.
+
+---
+
+## 14. Compatibility Rethink for Different-Ayah-Count Riwayahs
 
 **Problem**
 The current compatibility model assumes all riwayahs share the same ayah
@@ -170,12 +322,12 @@ groups, and updating `RiwayahCompatibilityService.swift` and `ReciterResolver.sw
 to use them.
 
 **Dependency**
-Requires tasks 4 and 8 to be completed first, since they all share the same
+Requires tasks 9 and 12 to be completed first, since they all share the same
 underlying alignment model.
 
 ---
 
-## 10. Auto-Segment Recordings via Quran Detection
+## 15. Auto-Segment Recordings via Quran Detection
 
 **Problem**
 All annotation is currently manual — users place markers on a waveform to
@@ -203,7 +355,7 @@ but requires significant R&D.
 
 ---
 
-## 11. Reciter CDN Import Rework + Admin Review System
+## 16. Reciter CDN Import Rework + Admin Review System
 
 **Problem**
 Currently, importing a CDN source requires manually entering a URL or manifest.
