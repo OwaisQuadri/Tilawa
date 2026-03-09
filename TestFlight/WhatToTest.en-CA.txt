@@ -1,12 +1,3 @@
-## CDN Download Status Moved to Manage CDN
-
-- Open a reciter with a CDN source
-- Verify the CDN row no longer shows download progress or cache badge
-- Tap the CDN row to open Manage CDN
-- Verify a "Cache Status" section appears at the top showing cache coverage
-- If you have multiple CDN sources, verify each shows its own independent cache size
-- Start a download and verify progress appears in the Cache Status section (not the reciter row)
-- For a CDN with incomplete availability, verify it shows "Fully cached" when all available surahs are downloaded
 ## Multiple Segments for Same Ayah
 
 ### Annotation Editor — Duplicate Markers
