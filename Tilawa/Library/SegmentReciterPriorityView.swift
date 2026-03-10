@@ -5,6 +5,7 @@ import SwiftData
 struct SegmentReciterPriorityView: View {
 
     let segmentOverride: ReciterSegmentOverride
+    let siblingOverrides: [ReciterSegmentOverride]
 
     @Environment(\.modelContext) private var context
 
@@ -16,6 +17,7 @@ struct SegmentReciterPriorityView: View {
     @State private var endAyah:    Int = 7
 
     @State private var orderedEntries: [SegmentReciterEntry] = []
+    @State private var showOverlapAlert = false
 
     private let metadata = QuranMetadataService.shared
 
@@ -28,6 +30,39 @@ struct SegmentReciterPriorityView: View {
         return "\(startName) \(startSurah):\(startAyah) – \(endName) \(endSurah):\(endAyah)"
     }
 
+    /// Ayahs claimed by sibling segment overrides (not this one).
+    private var claimedAyahs: Set<AyahRef> {
+        var claimed = Set<AyahRef>()
+        for sibling in siblingOverrides {
+            let range = sibling.ayahRange
+            var cur = range.start
+            while cur <= range.end {
+                claimed.insert(cur)
+                guard let next = metadata.ayah(after: cur) else { break }
+                cur = next
+            }
+        }
+        return claimed
+    }
+
+    /// Ayahs available for selection (all ayahs minus claimed by siblings).
+    private var allowedAyahs: Set<AyahRef>? {
+        let claimed = claimedAyahs
+        guard !claimed.isEmpty else { return nil }
+        var allowed = Set<AyahRef>()
+        allowed.reserveCapacity(6236)
+        for surah in 1...114 {
+            let count = metadata.ayahCount(surah: surah)
+            for ayah in 1...max(1, count) {
+                let ref = AyahRef(surah: surah, ayah: ayah)
+                if !claimed.contains(ref) {
+                    allowed.insert(ref)
+                }
+            }
+        }
+        return allowed
+    }
+
     var body: some View {
         List {
             rangeSection
@@ -37,6 +72,11 @@ struct SegmentReciterPriorityView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { loadState() }
         .onChange(of: allReciters.count) { _, _ in loadState() }
+        .alert("Overlap Detected", isPresented: $showOverlapAlert) {
+            Button("OK") { loadState() }
+        } message: {
+            Text("This range overlaps with another segment. The range has been reverted.")
+        }
     }
 
     // MARK: - Sections
@@ -45,7 +85,8 @@ struct SegmentReciterPriorityView: View {
     private var rangeSection: some View {
         Section("Range") {
             NavigationLink {
-                RangePickerView(title: "From", surah: $startSurah, ayah: $startAyah)
+                RangePickerView(title: "From", surah: $startSurah, ayah: $startAyah,
+                                allowedAyahs: allowedAyahs)
                     .onDisappear {
                         clampEndIfNeeded()
                         saveRange()
@@ -57,7 +98,8 @@ struct SegmentReciterPriorityView: View {
                 }
             }
             NavigationLink {
-                RangePickerView(title: "To", surah: $endSurah, ayah: $endAyah)
+                RangePickerView(title: "To", surah: $endSurah, ayah: $endAyah,
+                                allowedAyahs: allowedAyahs)
                     .onDisappear { saveRange() }
             } label: {
                 LabeledContent("To") {
@@ -166,6 +208,22 @@ struct SegmentReciterPriorityView: View {
     }
 
     private func saveRange() {
+        let newRange = AyahRange(
+            start: AyahRef(surah: startSurah, ayah: startAyah),
+            end: AyahRef(surah: endSurah, ayah: endAyah)
+        )
+        // Validate no overlap with sibling overrides
+        let claimed = claimedAyahs
+        var cur = newRange.start
+        while cur <= newRange.end {
+            if claimed.contains(cur) {
+                showOverlapAlert = true
+                return
+            }
+            guard let next = metadata.ayah(after: cur) else { break }
+            cur = next
+        }
+
         segmentOverride.startSurah = startSurah
         segmentOverride.startAyah  = startAyah
         segmentOverride.endSurah   = endSurah

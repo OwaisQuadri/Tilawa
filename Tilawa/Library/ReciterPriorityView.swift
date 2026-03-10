@@ -68,8 +68,11 @@ struct ReciterPriorityView: View {
         Section {
             ForEach(orderedSegments, id: \.id) { override in
                 NavigationLink {
-                    SegmentReciterPriorityView(segmentOverride: override)
-                        .onDisappear { loadSegments() }
+                    SegmentReciterPriorityView(
+                        segmentOverride: override,
+                        siblingOverrides: orderedSegments.filter { $0.id != override.id }
+                    )
+                    .onDisappear { loadSegments() }
                 } label: {
                     segmentRow(override)
                 }
@@ -83,6 +86,7 @@ struct ReciterPriorityView: View {
             } label: {
                 Label("Add Segment", systemImage: "plus.circle")
             }
+            .disabled(allAyahsClaimed)
         } header: {
             Text("Segments")
                 .font(.headline)
@@ -205,12 +209,48 @@ struct ReciterPriorityView: View {
         orderedSegments = (s.segmentOverrides ?? []).sorted { ($0.order ?? 0) < ($1.order ?? 0) }
     }
 
+    /// All ayahs claimed by existing segment overrides.
+    private var claimedAyahs: Set<AyahRef> {
+        var claimed = Set<AyahRef>()
+        for seg in orderedSegments {
+            let range = seg.ayahRange
+            var cur = range.start
+            while cur <= range.end {
+                claimed.insert(cur)
+                guard let next = metadata.ayah(after: cur) else { break }
+                cur = next
+            }
+        }
+        return claimed
+    }
+
+    /// Whether all 6236 ayahs are already claimed by segment overrides.
+    private var allAyahsClaimed: Bool { claimedAyahs.count >= 6236 }
+
     private func addSegment() {
         guard let s = settings else { return }
         let maxOrder = (s.segmentOverrides ?? []).compactMap { $0.order }.max() ?? -1
+
+        // Find the first unclaimed ayah as the default start
+        let claimed = claimedAyahs
+        var defaultStart = AyahRef(surah: 1, ayah: 1)
+        while claimed.contains(defaultStart) {
+            guard let next = metadata.ayah(after: defaultStart) else { break }
+            defaultStart = next
+        }
+        // Find the end of the unclaimed run (up to same surah or small range)
+        var defaultEnd = defaultStart
+        var cur = defaultStart
+        while true {
+            guard let next = metadata.ayah(after: cur) else { break }
+            if claimed.contains(next) || next.surah != defaultStart.surah { break }
+            defaultEnd = next
+            cur = next
+        }
+
         let override = ReciterSegmentOverride(
-            startSurah: 1, startAyah: 1,
-            endSurah: 1,   endAyah: 7,
+            startSurah: defaultStart.surah, startAyah: defaultStart.ayah,
+            endSurah: defaultEnd.surah,     endAyah: defaultEnd.ayah,
             order: maxOrder + 1
         )
         context.insert(override)

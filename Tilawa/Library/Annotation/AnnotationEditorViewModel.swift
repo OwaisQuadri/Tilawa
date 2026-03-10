@@ -266,7 +266,13 @@ final class AnnotationEditorViewModel {
         recording.coversSurahStart = surahNumbers.min()
         recording.coversSurahEnd = surahNumbers.max()
 
-        // 6. Delete AyahMarkers (editing session complete)
+        // 6. Ensure reciters are in the priority list for playback resolution
+        let reciterIds = Set(createdSegmentsList.compactMap { $0.reciter?.id })
+        for reciterId in reciterIds {
+            PlaybackSettings.ensureReciterInPriorityList(reciterId, context: context)
+        }
+
+        // 7. Delete AyahMarkers (editing session complete)
         for marker in markers {
             context.delete(marker)
         }
@@ -711,6 +717,11 @@ final class AnnotationEditorViewModel {
             }
         }
 
+        // Merge adjacent end-only + start-only markers that now share a position
+        Self.mergeAdjacentMarkers(ayahMarkers.filter { !$0.isDeleted },
+                                  totalDuration: newDuration,
+                                  delete: { context.delete($0) })
+
         // Delete all crop markers
         for marker in markers.filter({ $0.resolvedMarkerType != .ayah }) {
             context.delete(marker)
@@ -791,5 +802,126 @@ final class AnnotationEditorViewModel {
         }
 
         return segmentRanges
+    }
+
+    /// Pure function: merges adjacent end-only + start-only markers at the same position.
+    /// Returns the surviving markers after merge + edge cleanup.
+    nonisolated static func mergeAdjacentMarkerInputs(
+        _ inputs: [MarkerInput],
+        totalDuration: Double
+    ) -> [MarkerInput] {
+        struct MutableMarker {
+            var positionSeconds: Double
+            var assignedSurah: Int?
+            var assignedAyah: Int?
+            var assignedEndSurah: Int?
+            var assignedEndAyah: Int?
+            var deleted = false
+        }
+
+        var markers = inputs.map {
+            MutableMarker(positionSeconds: $0.positionSeconds,
+                          assignedSurah: $0.assignedSurah,
+                          assignedAyah: $0.assignedAyah,
+                          assignedEndSurah: $0.assignedEndSurah,
+                          assignedEndAyah: $0.assignedEndAyah)
+        }.sorted { $0.positionSeconds < $1.positionSeconds }
+        guard !markers.isEmpty else { return [] }
+
+        let epsilon = 0.001
+
+        var i = 0
+        while i < markers.count - 1 {
+            let a = markers[i]
+            let b = markers[i + 1]
+
+            let aIsEndOnly = (a.assignedEndSurah != nil && a.assignedEndAyah != nil)
+                && (a.assignedSurah == nil || a.assignedAyah == nil)
+            let bIsStartOnly = (b.assignedSurah != nil && b.assignedAyah != nil)
+                && (b.assignedEndSurah == nil || b.assignedEndAyah == nil)
+
+            if aIsEndOnly && bIsStartOnly && abs(a.positionSeconds - b.positionSeconds) < epsilon {
+                markers[i].assignedSurah = b.assignedSurah
+                markers[i].assignedAyah = b.assignedAyah
+                markers[i + 1].deleted = true
+                i += 2
+            } else {
+                i += 1
+            }
+        }
+
+        let remaining = markers.enumerated().filter { !$0.element.deleted }
+        if let first = remaining.first {
+            let isEndOnly = (first.element.assignedEndSurah != nil && first.element.assignedEndAyah != nil)
+                && (first.element.assignedSurah == nil || first.element.assignedAyah == nil)
+            if isEndOnly && first.element.positionSeconds < epsilon {
+                markers[first.offset].deleted = true
+            }
+        }
+        if let last = remaining.last {
+            let isStartOnly = (last.element.assignedSurah != nil && last.element.assignedAyah != nil)
+                && (last.element.assignedEndSurah == nil || last.element.assignedEndAyah == nil)
+            if isStartOnly && abs(last.element.positionSeconds - totalDuration) < epsilon {
+                markers[last.offset].deleted = true
+            }
+        }
+
+        return markers.filter { !$0.deleted }.map {
+            MarkerInput(positionSeconds: $0.positionSeconds,
+                        assignedSurah: $0.assignedSurah,
+                        assignedAyah: $0.assignedAyah,
+                        assignedEndSurah: $0.assignedEndSurah,
+                        assignedEndAyah: $0.assignedEndAyah)
+        }
+    }
+
+    /// Merges adjacent end-only + start-only AyahMarker objects at the same position.
+    static func mergeAdjacentMarkers(_ markers: [AyahMarker],
+                                     totalDuration: Double,
+                                     delete: (AyahMarker) -> Void) {
+        let sorted = markers.sorted { ($0.positionSeconds ?? 0) < ($1.positionSeconds ?? 0) }
+        guard !sorted.isEmpty else { return }
+
+        let epsilon = 0.001
+
+        var i = 0
+        while i < sorted.count - 1 {
+            let a = sorted[i]
+            let b = sorted[i + 1]
+            let aPos = a.positionSeconds ?? 0
+            let bPos = b.positionSeconds ?? 0
+
+            let aIsEndOnly = (a.assignedEndSurah != nil && a.assignedEndAyah != nil)
+                && (a.assignedSurah == nil || a.assignedAyah == nil)
+            let bIsStartOnly = (b.assignedSurah != nil && b.assignedAyah != nil)
+                && (b.assignedEndSurah == nil || b.assignedEndAyah == nil)
+
+            if aIsEndOnly && bIsStartOnly && abs(aPos - bPos) < epsilon {
+                a.assignedSurah = b.assignedSurah
+                a.assignedAyah = b.assignedAyah
+                a.reciterID = b.reciterID
+                a.riwayah = b.riwayah
+                delete(b)
+                i += 2
+            } else {
+                i += 1
+            }
+        }
+
+        let remaining = sorted.filter { !$0.isDeleted }
+        if let first = remaining.first {
+            let isEndOnly = (first.assignedEndSurah != nil && first.assignedEndAyah != nil)
+                && (first.assignedSurah == nil || first.assignedAyah == nil)
+            if isEndOnly && (first.positionSeconds ?? 0) < epsilon {
+                delete(first)
+            }
+        }
+        if let last = remaining.last {
+            let isStartOnly = (last.assignedSurah != nil && last.assignedAyah != nil)
+                && (last.assignedEndSurah == nil || last.assignedEndAyah == nil)
+            if isStartOnly && abs((last.positionSeconds ?? 0) - totalDuration) < epsilon {
+                delete(last)
+            }
+        }
     }
 }
