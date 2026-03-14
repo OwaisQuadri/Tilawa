@@ -643,15 +643,32 @@ struct PlaybackSetupSheet: View {
     }
 
     private func availableAyahs(for reciter: Reciter, targetRiwayah: Riwayah) -> Set<AyahRef>? {
-        // Local-only reciter: derive from annotated RecordingSegments
-        if !reciter.hasCDN {
-            return reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter, targetRiwayah: targetRiwayah) : nil
+        // Compute CDN availability (if applicable)
+        let cdnAvail: Set<AyahRef>? = reciter.hasCDN ? cdnAvailableAyahs(for: reciter, targetRiwayah: targetRiwayah) : nil
+
+        // Compute local/personal recording availability (if applicable)
+        let localAvail: Set<AyahRef>? = reciter.hasPersonalRecordings ? availableAyahsForLocalReciter(reciter, targetRiwayah: targetRiwayah) : nil
+
+        // Union: nil means full coverage (or unchecked CDN), so if either is nil, use the other
+        switch (cdnAvail, localAvail) {
+        case (nil, nil):
+            return nil
+        case (let avail?, nil):
+            return avail
+        case (nil, let avail?):
+            return avail
+        case (var cdn?, let local?):
+            cdn.formUnion(local)
+            return cdn.count >= 6236 ? nil : cdn
         }
-        // CDN reciter: use per-source pre-computed availability check
+    }
+
+    /// CDN-only availability: returns the set of available ayahs from CDN sources,
+    /// or nil if CDN has full coverage or hasn't been checked.
+    private func cdnAvailableAyahs(for reciter: Reciter, targetRiwayah: Riwayah) -> Set<AyahRef>? {
         let sources = reciter.cdnSources ?? []
         guard !sources.isEmpty else { return nil }
 
-        // Build union of missing ayahs across all checked sources
         let checkedSources = sources.filter { $0.availabilityChecked }
         guard !checkedSources.isEmpty else { return nil }
 
@@ -669,7 +686,6 @@ struct PlaybackSetupSheet: View {
         }
         guard !cdnRiwayaat.isEmpty else { return nil }
 
-        // Union of missing across all checked sources
         var allMissing = Set<AyahRef>()
         for src in checkedSources { allMissing.formUnion(src.missingAyahs) }
 

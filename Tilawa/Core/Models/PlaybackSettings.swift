@@ -135,4 +135,29 @@ final class PlaybackSettings {
             override.reciterPriority = (override.reciterPriority ?? []).filter { $0.reciterId != reciterId }
         }
     }
+
+    /// Ensures a reciter is present in the global priority list and all segment overrides.
+    /// Safe to call multiple times — no-ops if already present.
+    static func ensureReciterInPriorityList(_ reciterId: UUID, context: ModelContext) {
+        guard let settings = try? context.fetch(FetchDescriptor<PlaybackSettings>()).first else { return }
+
+        let alreadyInGlobal = (settings.reciterPriority ?? []).contains { $0.reciterId == reciterId }
+        if !alreadyInGlobal {
+            let maxOrder = (settings.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
+            let entry = ReciterPriorityEntry(order: maxOrder + 1, reciterId: reciterId)
+            context.insert(entry)
+            settings.reciterPriority = (settings.reciterPriority ?? []) + [entry]
+        }
+
+        for segment in settings.segmentOverrides ?? [] {
+            let alreadyInSegment = (segment.reciterPriority ?? []).contains { $0.reciterId == reciterId }
+            guard !alreadyInSegment else { continue }
+            let maxOrder = (segment.reciterPriority ?? []).compactMap { $0.order }.max() ?? -1
+            let segEntry = SegmentReciterEntry(order: maxOrder + 1, reciterId: reciterId)
+            context.insert(segEntry)
+            segment.reciterPriority = (segment.reciterPriority ?? []) + [segEntry]
+        }
+
+        try? context.save()
+    }
 }
