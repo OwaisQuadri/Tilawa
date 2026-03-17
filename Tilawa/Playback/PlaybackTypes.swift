@@ -38,6 +38,7 @@ struct PlaybackSettingsSnapshot: Sendable {
     let reciterPriority: [ReciterSnapshot]
     let segmentOverrides: [SegmentOverrideSnapshot]
     let riwayah: Riwayah
+    let bismillahBeforeSurah: Bool
     /// Ayahs covered by at least one segment. Non-nil only when all reciters are local-only.
     /// PlaybackQueue uses this to skip gap ayahs between non-contiguous segments.
     let coveredAyahs: Set<AyahRef>?

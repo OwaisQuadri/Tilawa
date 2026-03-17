@@ -87,4 +87,26 @@ struct QuranMetadataServiceTests {
         #expect(svc.surah(0) == nil)
         #expect(svc.surah(115) == nil)
     }
+
+    // MARK: - needsBismillah
+
+    @Test func needsBismillahForSurah2() {
+        let svc = makeService()
+        #expect(svc.needsBismillah(AyahRef(surah: 2, ayah: 1)) == true)
+    }
+
+    @Test func noBismillahForFatiha() {
+        let svc = makeService()
+        #expect(svc.needsBismillah(AyahRef(surah: 1, ayah: 1)) == false)
+    }
+
+    @Test func noBismillahForTawbah() {
+        let svc = makeService()
+        #expect(svc.needsBismillah(AyahRef(surah: 9, ayah: 1)) == false)
+    }
+
+    @Test func noBismillahForMidSurah() {
+        let svc = makeService()
+        #expect(svc.needsBismillah(AyahRef(surah: 2, ayah: 5)) == false)
+    }
 }

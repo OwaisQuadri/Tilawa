@@ -112,6 +112,13 @@ final class QuranMetadataService: Sendable {
         AyahRef(surah: surah, ayah: 1)
     }
 
+    /// Returns true if the given ayah is the first ayah of a surah that starts with Bismillah.
+    /// Surah 1 (Al-Fatiha) excluded because 1:1 IS the Bismillah.
+    /// Surah 9 (At-Tawbah) excluded because it has no Bismillah.
+    func needsBismillah(_ ref: AyahRef) -> Bool {
+        ref.ayah == 1 && ref.surah != 1 && ref.surah != 9
+    }
+
     var totalAyahCount: Int {
         surahs.reduce(0) { $0 + $1.ayahCount }
     }

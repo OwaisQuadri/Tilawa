@@ -268,6 +268,7 @@ final class SlidingWindowCoordinator {
             reciterPriority: base.reciterPriority,
             segmentOverrides: base.segmentOverrides,
             riwayah: base.riwayah,
+            bismillahBeforeSurah: base.bismillahBeforeSurah,
             coveredAyahs: base.coveredAyahs
         )
     }
@@ -293,6 +294,7 @@ final class SlidingWindowCoordinator {
             reciterPriority: base.reciterPriority,
             segmentOverrides: base.segmentOverrides,
             riwayah: base.riwayah,
+            bismillahBeforeSurah: base.bismillahBeforeSurah,
             coveredAyahs: base.coveredAyahs
         )
     }

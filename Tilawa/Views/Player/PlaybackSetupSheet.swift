@@ -218,6 +218,8 @@ struct PlaybackSetupSheet: View {
                     Text("2 sec").tag(2000)
                     Text("3 sec").tag(3000)
                 }
+
+                Toggle("Bismillah before surah", isOn: bismillahBinding(s))
             } header: {
                 Text("Playback")
             } footer: {
@@ -1065,6 +1067,10 @@ struct PlaybackSetupSheet: View {
 
     private func gapBinding(_ s: PlaybackSettings) -> Binding<Int> {
         Binding(get: { s.safeGapMs }, set: { s.gapBetweenAyaatMs = $0; save() })
+    }
+
+    private func bismillahBinding(_ s: PlaybackSettings) -> Binding<Bool> {
+        Binding(get: { s.safeBismillahBeforeSurah }, set: { s.bismillahBeforeSurah = $0; save() })
     }
 
     private func ayahRepeatBinding(_ s: PlaybackSettings) -> Binding<Int> {

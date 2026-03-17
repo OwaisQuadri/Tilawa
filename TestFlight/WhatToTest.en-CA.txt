@@ -1,29 +1,27 @@
-## TIL-6: Ayah Text Search in Jump Sheet
+## TIL-3: Bismillah Before Each Surah
 
-**Latin Transliteration Search**
-1. Open Jump Sheet, type "bismillah"
-2. Verify 1:1 (Fatiha) appears near top of results (high relevance due to short ayah + full match)
-3. Verify match is bolded in Arabic snippet: بِسۡمِ ٱللَّهِ
-4. Type "alhamdu" → find 1:2
-5. Type "rabbi" → find multiple surahs starting with that word
-6. Type "alHamdu" (capital H) → verify case-insensitive; same results as "alhamdu"
+**Basic Functionality**
+1. Open playback setup, set range to Surah 2 (Al-Baqarah) starting from ayah 1
+2. Tap Play → verify Bismillah audio plays before ayah 1, then Al-Baqarah ayah 1 plays
+3. During Bismillah playback, verify the UI shows "Al-Baqarah - 1" as current ayah (not "Al-Fatihah - 1")
 
-**Arabic Script Search**
-1. Type "الحمد" (Arabic) → find 1:2 and other matches
-2. Type "فبأي آلاء ربكما" → find repeated phrase in Surah Ar-Rahman (55:13, 55:16, etc.)
-3. Verify match is bolded, surrounding text is secondary color
-4. For long ayahs, verify text is truncated: "… [match] …" or "[match] …"
+**Excluded Surahs**
+1. Play from Surah 1 (Al-Fatihah) ayah 1 → no duplicate Bismillah (1:1 IS the Bismillah)
+2. Play from Surah 9 (At-Tawbah) ayah 1 → no Bismillah (Islamic tradition)
 
-**Recent Searches**
-1. Search "bismillah", tap result 1:1 → navigate
-2. Reopen Jump Sheet → before typing, verify "Recent Searches" section appears with "bismillah" as a chip
-3. Do 2–3 more searches (e.g. "rabbi", "alhamdu") → verify all appear as chips, newest first (limit 10)
-4. Tap a chip → search field fills with that query, results appear
-5. Tap "Clear" button → chips disappear
+**Mid-Surah Start**
+1. Play from Surah 2 ayah 5 → no Bismillah (only plays at surah start)
 
-**Edge Cases**
-1. Type "3" (representing ayn) → verify it matches عُ in words
-2. Type "'" (apostrophe) → verify it auto-converts to "3" for searching الع words
-3. Type query < 3 characters → verify no search results (only traditional jump modes work)
-4. Type exact match vs partial: "alhamdu" vs "hamdu" → both should find 1:2 and other matches
-5. Type typo "alhambu" (b instead of d) → should still find results due to fuzzy matching (1+ edit distance for 7-char query)
+**Ayah Repeats**
+1. Set ayah repeat to 3, play Surah 2 ayah 1
+2. Verify: Bismillah plays once, then ayah 1 repeats 3 times (Bismillah does NOT repeat)
+
+**Toggle Setting**
+1. In playback setup sheet, find "Bismillah before surah" toggle in Playback section
+2. Toggle OFF, play Surah 2 ayah 1 → no Bismillah plays
+3. Toggle ON, play again → Bismillah plays
+
+**Skip Controls**
+1. Play a range crossing surah boundaries (e.g. end of Surah 2 into Surah 3)
+2. Skip forward into Surah 3 ayah 1 → Bismillah plays
+3. Skip backward to Surah 3 ayah 1 → Bismillah plays again

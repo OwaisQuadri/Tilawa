@@ -55,6 +55,9 @@ final class PlaybackSettings {
     var slidingWindowConnectionWindow: Int?   // C
     var slidingWindowFullRangeRepeats: Int?   // D
 
+    // --- Bismillah ---
+    var bismillahBeforeSurah: Bool?   // default true via safe accessor
+
     // --- Display ---
     var showRepetitionCounter: Bool?
     var showReciterName: Bool?
@@ -91,6 +94,7 @@ final class PlaybackSettings {
         s.connectionAyahAfter = 0
         s.selectedRiwayah = Riwayah.hafs.rawValue
         s.usePageRange = false
+        s.bismillahBeforeSurah = true
         s.showRepetitionCounter = true
         s.showReciterName = true
         return s
@@ -113,6 +117,7 @@ final class PlaybackSettings {
     var safeSWConnectionRepeats: Int { slidingWindowConnectionRepeats ?? 3 }
     var safeSWConnectionWindow: Int { slidingWindowConnectionWindow ?? 2 }
     var safeSWFullRangeRepeats: Int { slidingWindowFullRangeRepeats ?? 10 }
+    var safeBismillahBeforeSurah: Bool { bismillahBeforeSurah ?? true }
 
     var sortedReciterPriority: [ReciterPriorityEntry] {
         (reciterPriority ?? [])
