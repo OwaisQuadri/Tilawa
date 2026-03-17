@@ -92,6 +92,7 @@ final class PlaybackViewModel {
             reciterPriority: reciters.map { ReciterSnapshot(reciterId: $0.id ?? UUID(), reciter: $0) },
             segmentOverrides: [],
             riwayah: recording.riwayahs.first ?? .hafs,
+            bismillahBeforeSurah: true,
             coveredAyahs: coveredAyahsForRecording(recording)
         )
         await engine.play(range: range, settings: snapshot)
@@ -211,6 +212,7 @@ final class PlaybackViewModel {
             reciterPriority: reciterSnapshots,
             segmentOverrides: segmentOverrideSnapshots,
             riwayah: settings.safeRiwayah,
+            bismillahBeforeSurah: settings.safeBismillahBeforeSurah,
             coveredAyahs: coveredAyahs
         )
     }

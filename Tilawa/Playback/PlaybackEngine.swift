@@ -56,6 +56,7 @@ final class PlaybackEngine {
     private var ayahStartDate: Date?       // Wall-clock time when current ayah began playing
     private var pausedElapsedTime: TimeInterval = 0  // Elapsed when last paused
     private var isInPlainRangePass: Bool = false
+    private var isPlayingBismillah: Bool = false
     private var pausedByInterruption: Bool = false
     private var interruptionObserver: NSObjectProtocol?
     private var routeChangeObserver: NSObjectProtocol?
@@ -170,6 +171,7 @@ final class PlaybackEngine {
         currentAyahRepetition = 0
         currentRangeRepetition = 0
         isInPlainRangePass = false
+        isPlayingBismillah = false
         unavailableAyah = nil
         nowPlaying.clear(deactivateSession: deactivateSession)
         if deactivateSession {
@@ -274,7 +276,7 @@ final class PlaybackEngine {
         let capturedSession = sessionID
 
         guard currentQueueIndex < ayahQueue.count,
-              let snapshot = activeSnapshot else {
+              let _ = activeSnapshot else {
             state = .idle
             return
         }
@@ -285,6 +287,67 @@ final class PlaybackEngine {
             currentAyah = ref  // Must be on MainActor so @Observable triggers SwiftUI from any call site
         }
         print("🔍 scheduleCurrentAyah: \(ref.surah):\(ref.ayah) [\(currentQueueIndex)/\(ayahQueue.count-1)]")
+
+        if shouldPlayBismillah(for: ref) {
+            await scheduleBismillah(thenScheduleAyah: capturedSession)
+        } else {
+            await scheduleAyahAudio(capturedSession: capturedSession)
+        }
+    }
+
+    /// Returns true if the current ayah should be preceded by a Bismillah pre-roll.
+    private func shouldPlayBismillah(for ref: AyahRef) -> Bool {
+        guard let snapshot = activeSnapshot,
+              snapshot.bismillahBeforeSurah,
+              metadata.needsBismillah(ref) else { return false }
+        // Only before the first repetition of this ayah
+        return currentAyahRepetition <= 1
+    }
+
+    /// Resolves and plays Bismillah (1:1) audio, then schedules the actual ayah on completion.
+    private func scheduleBismillah(thenScheduleAyah capturedSession: UUID) async {
+        guard let snapshot = activeSnapshot else { return }
+        isPlayingBismillah = true
+
+        let bismillahRef = AyahRef(surah: 1, ayah: 1)
+        guard let item = await resolver.resolve(ref: bismillahRef, snapshot: snapshot, rangeBound: nil) else {
+            // Bismillah unavailable — proceed to the actual ayah
+            isPlayingBismillah = false
+            guard sessionID == capturedSession else { return }
+            await scheduleAyahAudio(capturedSession: capturedSession)
+            return
+        }
+
+        guard sessionID == capturedSession else { isPlayingBismillah = false; return }
+
+        do {
+            try scheduleSegment(item) { [weak self, capturedSession] in
+                Task {
+                    guard self?.sessionID == capturedSession else { return }
+                    self?.isPlayingBismillah = false
+                    await self?.scheduleAyahAudio(capturedSession: capturedSession)
+                }
+            }
+            if !playerNode.isPlaying {
+                playerNode.play()
+            }
+            state = .playing
+        } catch {
+            isPlayingBismillah = false
+            guard sessionID == capturedSession else { return }
+            await scheduleAyahAudio(capturedSession: capturedSession)
+        }
+    }
+
+    /// Resolves and schedules the audio for the current ayah in the queue.
+    private func scheduleAyahAudio(capturedSession: UUID) async {
+        guard currentQueueIndex < ayahQueue.count,
+              let snapshot = activeSnapshot else {
+            state = .idle
+            return
+        }
+
+        let ref = ayahQueue[currentQueueIndex]
 
         guard let item = await resolver.resolve(ref: ref, snapshot: snapshot,
                                                 rangeBound: activeSnapshot?.range.end) else {
