@@ -111,6 +111,7 @@ struct AnnotationEditorView: View {
             }
             .alert("Finalize Recording", isPresented: $showFinalizeConfirm) {
                 Button("Finalize", role: .destructive) {
+                    Haptics.notification(.warning)
                     Task {
                         do {
                             try await vm.finalizeRecording(markers: recordingMarkers, context: context)
@@ -413,6 +414,7 @@ struct AnnotationEditorView: View {
     }
 
     private func addMarkerAtCurrentPosition() {
+        Haptics.impact(.medium)
         let pos = vm.previewPosition
         let newMarker = vm.addMarker(at: pos, context: context)
 

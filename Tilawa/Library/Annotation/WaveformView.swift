@@ -124,6 +124,7 @@ struct WaveformView: View {
                 .gesture(
                     DragGesture(minimumDistance: 4, coordinateSpace: .named("waveform"))
                         .onChanged { value in
+                            Haptics.selection()
                             let newSeconds = max(0, min(duration,
                                 Double(value.location.x / size.width) * duration))
                             onMarkerMoved(marker, newSeconds)

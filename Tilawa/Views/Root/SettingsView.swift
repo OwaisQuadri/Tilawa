@@ -9,6 +9,8 @@ struct SettingsView: View {
     @Query private var allPlaybackSettings: [PlaybackSettings]
     @Query private var allReciters: [Reciter]
 
+    @AppStorage("settings.hapticsEnabled") private var hapticsEnabled = true
+
     @State private var totalCacheBytes: Int64 = 0
     @State private var isLoadingStorage = false
     @State private var showClearAllConfirmation = false
@@ -60,6 +62,11 @@ struct SettingsView: View {
                     }
                 }
 
+                // MARK: - Haptics
+                Section("Haptics") {
+                    Toggle("Haptic Feedback", isOn: $hapticsEnabled)
+                }
+
                 // MARK: - Storage
                 Section {
                     Button(role: .destructive) {
@@ -83,6 +90,7 @@ struct SettingsView: View {
                 }
                 .confirmationDialog("Clear All Cache?", isPresented: $showClearAllConfirmation) {
                     Button("Delete All Cached Audio", role: .destructive) {
+                        Haptics.notification(.warning)
                         Task { await clearAllCache() }
                     }
                 } message: {

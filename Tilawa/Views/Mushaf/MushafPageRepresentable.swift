@@ -27,7 +27,7 @@ struct MushafPageRepresentable: UIViewRepresentable {
             guard gesture.state == .began, let view = managedView else { return }
             let location = gesture.location(in: view)
             guard let wordLocation = view.wordAt(point: location) else { return }
-            UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+            Haptics.impact(.medium)
             parent.onWordLongPressed?(wordLocation)
         }
     }

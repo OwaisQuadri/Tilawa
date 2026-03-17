@@ -8,7 +8,6 @@ most impact for the least work.
 | # | Task | Scope |
 |---|------|-------|
 | TIL-3 | [Bismillah Before Each Surah (Except Tawbah)](#til-3-bismillah-before-each-surah-except-tawbah) | Small |
-| TIL-4 | [Add Haptic Feedback](#til-4-add-haptic-feedback) | Small |
 | TIL-7 | [Finalize Should Strip Audio Between Ayah Segments](#til-7-finalize-should-strip-audio-between-ayah-segments) | Moderate |
 | TIL-8 | [Displaying Masahif for Non-Hafs Riwayahs](#til-8-displaying-masahif-for-non-hafs-riwayahs) | Large |
 | TIL-9 | [Horizontal Two-Page Landscape Layout](#til-9-horizontal-two-page-landscape-layout) | Large |
@@ -31,7 +30,6 @@ themselves are safe to run in parallel.
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
 | E — Riwayah data | TIL-10, TIL-20 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
 | F — Mushaf rendering | TIL-8, TIL-9 | `MushafView`, `MushafPageView`, `MushafViewModel` |
-| G — Haptics (do last) | TIL-4 | Touches many views — best merged after other UI work |
 | H — ML / R&D | TIL-11 | Mostly new files, independent |
 
 ---
@@ -52,25 +50,6 @@ except At-Tawbah (Surah 9), which begins without one.
 
 **Scope**: Small — playback queue insertion logic + a setting toggle. No new
 audio files needed.
-
----
-
-## TIL-4. Add Haptic Feedback
-
-**Problem**
-The app has no tactile feedback. Interactions like page turns, playback
-controls, marker placement, and navigation feel flat without haptics.
-
-**What's needed**
-- Add `UIImpactFeedbackGenerator` / `UISelectionFeedbackGenerator` haptics to
-  key interactions: page swipes, play/pause, ayah marker placement, picker
-  selections, and destructive confirmations
-- Use appropriate feedback styles (light for selections, medium for actions,
-  heavy/notification for errors or completions)
-- Make haptics toggleable in settings (default: on)
-
-**Scope**: Small — sprinkle `UIFeedbackGenerator` calls at existing interaction
-points. No architectural changes.
 
 ---
 

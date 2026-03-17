@@ -345,6 +345,7 @@ struct PlaybackSetupSheet: View {
                                 titleVisibility: .visible) {
                 if let preset = presetToDelete {
                     Button("Delete \"\(preset.safeName)\"", role: .destructive) {
+                        Haptics.notification(.warning)
                         context.delete(preset)
                         save()
                         presetToDelete = nil

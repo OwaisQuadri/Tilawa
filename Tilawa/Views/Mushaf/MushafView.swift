@@ -26,8 +26,9 @@ struct MushafView: View {
             .tabViewStyle(.page(indexDisplayMode: .never))
             .environment(\.layoutDirection, .rightToLeft)
             .ignoresSafeArea(.container, edges: .bottom)
-            .onChange(of: mushafVM.currentPage, initial: true) { _, newPage in
+            .onChange(of: mushafVM.currentPage, initial: true) { oldPage, newPage in
                 mushafVM.onPageChanged(to: newPage)
+                if oldPage != newPage { Haptics.impact(.light) }
             }
             .task(id: mushafVM.currentPage) {
                 let center = mushafVM.currentPage
@@ -76,6 +77,7 @@ struct MushafView: View {
                        $0.surah == ref.surah && $0.ayah == ref.ayah
                    }) {
                     Button("Remove Bookmark", role: .destructive) {
+                        Haptics.notification(.warning)
                         modelContext.delete(existing)
                     }
                 } else {
