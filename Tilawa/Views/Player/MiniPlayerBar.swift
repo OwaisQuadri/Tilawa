@@ -46,6 +46,7 @@ struct MiniPlayerBar: View {
             // Playback controls
             HStack(spacing: 16) {
                 Button {
+                    Haptics.impact(.light)
                     Task { await playback.skipToPreviousAyah() }
                 } label: {
                     Image(systemName: "backward.fill")
@@ -55,6 +56,7 @@ struct MiniPlayerBar: View {
                 }
 
                 Button {
+                    Haptics.impact(.medium)
                     if playback.isPlayingOrLoading { playback.pause() } else { playback.resume() }
                 } label: {
                     Image(systemName: playback.isPlayingOrLoading ? "pause.fill" : "play.fill")
@@ -64,6 +66,7 @@ struct MiniPlayerBar: View {
                 }
 
                 Button {
+                    Haptics.impact(.light)
                     Task { await playback.skipToNextAyah() }
                 } label: {
                     Image(systemName: "forward.fill")
@@ -73,6 +76,7 @@ struct MiniPlayerBar: View {
                 }
 
                 Button {
+                    Haptics.impact(.light)
                     playback.stop()
                 } label: {
                     Image(systemName: "xmark")

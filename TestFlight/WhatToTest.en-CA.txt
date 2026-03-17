@@ -1,27 +1,32 @@
-## TIL-3: Bismillah Before Each Surah
+## TIL-4: Haptic Feedback
 
-**Basic Functionality**
-1. Open playback setup, set range to Surah 2 (Al-Baqarah) starting from ayah 1
-2. Tap Play → verify Bismillah audio plays before ayah 1, then Al-Baqarah ayah 1 plays
-3. During Bismillah playback, verify the UI shows "Al-Baqarah - 1" as current ayah (not "Al-Fatihah - 1")
+**Settings Toggle**
+1. Open Settings tab → verify new "Haptics" section with "Haptic Feedback" toggle
+2. Toggle defaults to ON
 
-**Excluded Surahs**
-1. Play from Surah 1 (Al-Fatihah) ayah 1 → no duplicate Bismillah (1:1 IS the Bismillah)
-2. Play from Surah 9 (At-Tawbah) ayah 1 → no Bismillah (Islamic tradition)
+**Page Swipes (Mushaf)**
+1. Swipe between mushaf pages → feel a light tap on each page turn
 
-**Mid-Surah Start**
-1. Play from Surah 2 ayah 5 → no Bismillah (only plays at surah start)
+**Playback Controls (Mini Player)**
+1. Start playback, then tap Play/Pause → feel a medium tap
+2. Tap Skip Forward / Skip Backward → feel a light tap each
+3. Tap Stop (X) → feel a light tap
 
-**Ayah Repeats**
-1. Set ayah repeat to 3, play Surah 2 ayah 1
-2. Verify: Bismillah plays once, then ayah 1 repeats 3 times (Bismillah does NOT repeat)
+**Long-Press Ayah (Mushaf)**
+1. Long-press an ayah on the mushaf page → feel a medium tap when the context menu appears
 
-**Toggle Setting**
-1. In playback setup sheet, find "Bismillah before surah" toggle in Playback section
-2. Toggle OFF, play Surah 2 ayah 1 → no Bismillah plays
-3. Toggle ON, play again → Bismillah plays
+**Annotation Editor**
+1. Open a recording's annotation editor
+2. Tap the "Marker" button to add a marker → feel a medium tap
+3. Drag a marker handle along the waveform → feel subtle selection ticks during drag
+4. Tap "Finalize" and confirm → feel a warning buzz on the destructive confirmation
 
-**Skip Controls**
-1. Play a range crossing surah boundaries (e.g. end of Surah 2 into Surah 3)
-2. Skip forward into Surah 3 ayah 1 → Bismillah plays
-3. Skip backward to Surah 3 ayah 1 → Bismillah plays again
+**Destructive Actions**
+1. Settings → Clear Cache → confirm "Delete All Cached Audio" → feel a warning buzz
+2. Long-press an ayah → "Remove Bookmark" → feel a warning buzz
+3. Playback setup → delete a sliding window preset → feel a warning buzz
+
+**Toggle OFF**
+1. Go to Settings → turn Haptic Feedback OFF
+2. Repeat all interactions above → verify NO haptic feedback fires
+3. Turn it back ON → verify haptics resume
