@@ -10,6 +10,7 @@ struct MushafPageRepresentable: UIViewRepresentable {
     var highlightedAyahEnd: AyahRef?
     var theme: MushafTheme
     var centeredPage: Bool = false
+    var riwayahContent: RiwayahPageContent?
     var onWordTapped: ((MushafPageUIView.WordLocation) -> Void)?
     var onWordLongPressed: ((MushafPageUIView.WordLocation) -> Void)?
 
@@ -42,6 +43,7 @@ struct MushafPageRepresentable: UIViewRepresentable {
         view.backgroundColor = .clear
         view.contentMode = .redraw
         view.centeredPage = centeredPage
+        view.riwayahContent = riwayahContent
         view.pageFont = font
         view.pageLayout = pageLayout
         view.theme = theme
@@ -62,6 +64,7 @@ struct MushafPageRepresentable: UIViewRepresentable {
     func updateUIView(_ uiView: MushafPageUIView, context: Context) {
         context.coordinator.parent = self
         uiView.centeredPage = centeredPage
+        uiView.riwayahContent = riwayahContent
         uiView.pageFont = font
         uiView.pageLayout = pageLayout
         uiView.highlightedWord = highlightedWord
@@ -69,5 +72,14 @@ struct MushafPageRepresentable: UIViewRepresentable {
         uiView.highlightedAyahEnd = highlightedAyahEnd
         uiView.theme = theme
         uiView.onWordTapped = onWordTapped
+    }
+
+    /// Let the view size itself vertically based on content for unicode text rendering.
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: MushafPageUIView, context: Context) -> CGSize? {
+        guard riwayahContent != nil else { return nil }
+        let width = proposal.width ?? UIScreen.main.bounds.width
+        let height = uiView.calculateContentHeight(for: width)
+        guard height > 0 else { return nil }
+        return CGSize(width: width, height: height)
     }
 }

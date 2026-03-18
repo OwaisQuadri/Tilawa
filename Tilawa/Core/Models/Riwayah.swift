@@ -45,7 +45,54 @@ enum Riwayah: String, CaseIterable, Codable, Identifiable {
     case ishaq = "ishaq"  // رواية إسحاق
     case idris = "idris"  // رواية إدريس
 
+    // MARK: - Rendering mode
+
+    enum RenderingMode {
+        case hafsGlyph    // QPC page-specific glyph fonts
+        case unicodeText  // Scheherazade + CTFrame (has bundled text JSON)
+        case pdf          // On-demand downloaded mushaf PDF
+    }
+
+    var renderingMode: RenderingMode {
+        switch self {
+        case .hafs: return .hafsGlyph
+        case .warsh, .qaloon: return .unicodeText
+        default: return .pdf
+        }
+    }
+
+    /// All riwayahs available for mushaf display.
+    static var availableForMushaf: [Riwayah] {
+        allCases
+    }
+
     // MARK: - Display metadata
+
+    /// Short name for compact display (e.g. header bar).
+    var shortName: String {
+        switch self {
+        case .hafs:           return "Hafs"
+        case .shuabah:        return "Shu'bah"
+        case .warsh:          return "Warsh"
+        case .qaloon:         return "Qaloon"
+        case .bazzi:          return "Al-Bazzi"
+        case .qunbul:         return "Qunbul"
+        case .dooriAbuAmr:    return "Ad-Doori"
+        case .soosi:          return "As-Soosi"
+        case .hisham:         return "Hisham"
+        case .ibnDhakwan:     return "Ibn Dhakwan"
+        case .khalafAnHamza:  return "Khalaf"
+        case .khallad:        return "Khallad"
+        case .abulHarith:     return "Abu'l-Harith"
+        case .dooriAlKisai:   return "Ad-Doori"
+        case .ibnWardan:      return "Ibn Wardan"
+        case .ibnJammaz:      return "Ibn Jammaz"
+        case .ruways:         return "Ruways"
+        case .rawh:           return "Rawh"
+        case .ishaq:          return "Ishaq"
+        case .idris:          return "Idris"
+        }
+    }
 
     var displayName: String {
         switch self {

@@ -11,6 +11,33 @@ final class MushafViewModel {
         static let currentPage = "mushaf.currentPage"
         static let fontSize    = "mushaf.fontSize"
         static let theme       = "mushaf.theme"
+        static let riwayah     = "mushaf.riwayah"
+        static let mushafStyle = "mushaf.style"
+        static let showSideIndicators = "mushaf.showSideIndicators"
+    }
+
+    // MARK: - Mushaf Style
+
+    enum MushafStyle: String, CaseIterable {
+        case uthmani = "uthmani"
+        case indopak = "indopak"
+
+        var displayName: String {
+            switch self {
+            case .uthmani: return "Uthmani"
+            case .indopak: return "Indopak 15-line"
+            }
+        }
+    }
+
+    var mushafStyle: MushafStyle = .uthmani {
+        didSet { UserDefaults.standard.set(mushafStyle.rawValue, forKey: Keys.mushafStyle) }
+    }
+
+    /// The effective rendering mode considering both riwayah and mushaf style.
+    var effectiveRenderingMode: Riwayah.RenderingMode {
+        if activeRiwayah == .hafs && mushafStyle == .indopak { return .pdf }
+        return activeRiwayah.renderingMode
     }
 
     // MARK: - Page State
@@ -18,6 +45,7 @@ final class MushafViewModel {
     var currentPage: Int = 1
     var showJumpSheet: Bool = false
     var currentPageAyahRange: (first: AyahRef, last: AyahRef)? = nil
+    var nextPageAyahRange: (first: AyahRef, last: AyahRef)? = nil
 
     // MARK: - Highlighting
 
@@ -27,10 +55,24 @@ final class MushafViewModel {
     var highlightedAyahPage: Int?
     var highlightedWord: MushafPageUIView.WordLocation?
 
+    // MARK: - Riwayah
+
+    var activeRiwayah: Riwayah = .hafs {
+        didSet { UserDefaults.standard.set(activeRiwayah.rawValue, forKey: Keys.riwayah) }
+    }
+
+    var isHafs: Bool { activeRiwayah == .hafs }
+
     // MARK: - Theme
 
     var theme: MushafTheme = .standard {
         didSet { UserDefaults.standard.set(theme.name, forKey: Keys.theme) }
+    }
+
+    // MARK: - Page Side Indicators
+
+    var showSideIndicators: Bool = false {
+        didSet { UserDefaults.standard.set(showSideIndicators, forKey: Keys.showSideIndicators) }
     }
 
     // MARK: - Font
@@ -41,7 +83,7 @@ final class MushafViewModel {
     }
 
     var currentFont: CTFont {
-        fontProvider.hafsFont(size: fontSize)
+        isHafs ? fontProvider.hafsFont(size: fontSize) : fontProvider.riwayahFont(size: fontSize)
     }
 
     /// Returns the QCF V2 page-specific font for a given page number.
@@ -69,6 +111,18 @@ final class MushafViewModel {
         if let savedThemeName = UserDefaults.standard.string(forKey: Keys.theme) {
             // "Light" and "Dark" are legacy saved values → map to .standard
             theme = [MushafTheme.standard, .sepia].first { $0.name == savedThemeName } ?? .standard
+        }
+
+        if let savedRiwayah = UserDefaults.standard.string(forKey: Keys.riwayah),
+           let riwayah = Riwayah(rawValue: savedRiwayah) {
+            activeRiwayah = riwayah
+        }
+
+        showSideIndicators = UserDefaults.standard.bool(forKey: Keys.showSideIndicators)
+
+        if let savedStyle = UserDefaults.standard.string(forKey: Keys.mushafStyle),
+           let style = MushafStyle(rawValue: savedStyle) {
+            mushafStyle = style
         }
     }
 
@@ -121,15 +175,26 @@ final class MushafViewModel {
         highlightedWord = nil
         highlightedAyahPage = nil
         showJumpSheet = false
-        currentPage = metadata.page(for: ref)  // immediate best-guess
-        scrollToAyah(ref)                       // async exact correction
+
+        let estimated = metadata.page(for: ref)
+        Task {
+            // Preload layout before scrolling so the page renders immediately
+            _ = try? await PageLayoutProvider.shared.layout(for: estimated)
+            currentPage = estimated
+            scrollToAyah(ref)
+        }
     }
 
     func jumpToPage(_ page: Int) {
-        currentPage = max(1, min(604, page))
+        let target = max(1, min(604, page))
         highlightedAyah = nil
         highlightedWord = nil
         showJumpSheet = false
+
+        Task {
+            _ = try? await PageLayoutProvider.shared.layout(for: target)
+            currentPage = target
+        }
     }
 
     // MARK: - Playback-driven scroll
@@ -188,13 +253,50 @@ final class MushafViewModel {
             let fontRange   = max(1, page - 15)...min(604, page + 15)
 
             await PageLayoutProvider.shared.evict(outside: layoutRange)
-            fontProvider.unregisterQCFFonts(outside: fontRange)
+            if isHafs {
+                fontProvider.unregisterQCFFonts(outside: fontRange)
+            } else {
+                await RiwayahPageLayoutBuilder.shared.evict(outside: layoutRange)
+            }
 
             guard !Task.isCancelled else { return }
-            if let layout = try? await PageLayoutProvider.shared.layout(for: page) {
-                let words = layout.lines.compactMap(\.words).flatMap { $0 }
-                if let first = words.first?.ayahRef, let last = words.last?.ayahRef {
-                    await MainActor.run { currentPageAyahRange = (first, last) }
+
+            // Compute ayah ranges for current page and next page (both may be visible)
+            let nextPg = min(604, page + 1)
+
+            if isHafs {
+                if let layout = try? await PageLayoutProvider.shared.layout(for: page) {
+                    let words = layout.lines.compactMap(\.words).flatMap { $0 }
+                    if let first = words.first?.ayahRef, let last = words.last?.ayahRef {
+                        await MainActor.run { currentPageAyahRange = (first, last) }
+                    }
+                }
+                if nextPg != page, let layout = try? await PageLayoutProvider.shared.layout(for: nextPg) {
+                    let words = layout.lines.compactMap(\.words).flatMap { $0 }
+                    if let first = words.first?.ayahRef, let last = words.last?.ayahRef {
+                        await MainActor.run { nextPageAyahRange = (first, last) }
+                    }
+                } else {
+                    await MainActor.run { nextPageAyahRange = nil }
+                }
+            } else {
+                if let content = try? await RiwayahPageLayoutBuilder.shared.build(
+                    page: page, riwayah: activeRiwayah
+                ) {
+                    let refs = content.ayahRefs
+                    if let first = refs.first, let last = refs.last {
+                        await MainActor.run { currentPageAyahRange = (first, last) }
+                    }
+                }
+                if nextPg != page, let content = try? await RiwayahPageLayoutBuilder.shared.build(
+                    page: nextPg, riwayah: activeRiwayah
+                ) {
+                    let refs = content.ayahRefs
+                    if let first = refs.first, let last = refs.last {
+                        await MainActor.run { nextPageAyahRange = (first, last) }
+                    }
+                } else {
+                    await MainActor.run { nextPageAyahRange = nil }
                 }
             }
         }
