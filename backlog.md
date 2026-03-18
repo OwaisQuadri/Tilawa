@@ -3,12 +3,12 @@
 Deferred work, sorted by ROI (value ÷ effort). Items near the top deliver the
 most impact for the least work.
 
-**Next available ticket ID: TIL-22**
+**Next available ticket ID: TIL-24**
 
 | # | Task | Scope |
 |---|------|-------|
-| TIL-3 | [Bismillah Before Each Surah (Except Tawbah)](#til-3-bismillah-before-each-surah-except-tawbah) | Small |
-| TIL-7 | [Finalize Should Strip Audio Between Ayah Segments](#til-7-finalize-should-strip-audio-between-ayah-segments) | Moderate |
+| TIL-22 | [Ayah Coordinate Maps for PDF Riwayahs](#til-22-ayah-coordinate-maps-for-pdf-riwayahs) | Medium |
+| TIL-23 | [Full Glyph Rendering for All 20 Riwayahs](#til-23-full-glyph-rendering-for-all-20-riwayahs) | Very Large |
 | TIL-8 | [Displaying Masahif for Non-Hafs Riwayahs](#til-8-displaying-masahif-for-non-hafs-riwayahs) | Large |
 | TIL-9 | [Horizontal Two-Page Landscape Layout](#til-9-horizontal-two-page-landscape-layout) | Large |
 | TIL-10 | [Compatibility Rethink for Different-Ayah-Count Riwayahs](#til-10-compatibility-rethink-for-different-ayah-count-riwayahs) | Large |
@@ -26,30 +26,10 @@ themselves are safe to run in parallel.
 | Group | Tasks | Key files touched |
 |-------|-------|-------------------|
 | A — Jump-to sheet | TIL-21 | `JumpToAyahSheet`, `ArabicTextSearchService` |
-| B — Playback engine | TIL-3 | `PlaybackSetupSheet`, `PlaybackQueue`, `PlaybackEngine`, `PlaybackSettings` |
 | C — CDN / Library UI | TIL-12 | `RecitersView`, `ReciterDetailView`, CDN views |
 | E — Riwayah data | TIL-10, TIL-20 | `Scripts/`, `RiwayahCompatibilityService`, `ReciterResolver` |
-| F — Mushaf rendering | TIL-8, TIL-9 | `MushafView`, `MushafPageView`, `MushafViewModel` |
+| F — Mushaf rendering | TIL-8, TIL-9, TIL-22, TIL-23 | `MushafView`, `MushafPageView`, `MushafViewModel`, `MushafPDFManager` |
 | H — ML / R&D | TIL-11 | Mostly new files, independent |
-
----
-
-## TIL-3. Bismillah Before Each Surah (Except Tawbah)
-
-**Problem**
-When playing a surah from the beginning, there is no Bismillah recited before it.
-Most masahif and traditional recitations include the Bismillah before every surah
-except At-Tawbah (Surah 9), which begins without one.
-
-**What's needed**
-- Before playing the first ayah of any surah (except Surah 9), automatically
-  prepend the Bismillah audio
-- Source the Bismillah audio from the reciter's Fatiha (1:1) segment — this
-  avoids needing a separate Bismillah file per reciter
-- Make this behaviour toggleable in playback settings (default: on)
-
-**Scope**: Small — playback queue insertion logic + a setting toggle. No new
-audio files needed.
 
 ---
 
@@ -245,3 +225,48 @@ current page.
 
 **Scope**: Medium — builds on the search index from TIL-6. Needs a similarity
 algorithm and UI, but no new data sources.
+
+---
+
+## TIL-22. Ayah Coordinate Maps for PDF Riwayahs
+
+**Problem**
+PDF-rendered riwayahs (12 of 20) only support page-level navigation during
+playback. No ayah highlighting is possible because there's no data mapping
+ayahs to bounding boxes on each page.
+
+**What's needed**
+- For each PDF-rendered riwayah, create a JSON file mapping each ayah to
+  bounding box coordinates on its page
+- Format: `{ "pages": [{ "page": 1, "ayahs": [{ "surah": 1, "ayah": 1, "rects": [{"x":..., "y":..., "w":..., "h":...}] }] }] }`
+- Integrate coordinate data into `MushafPDFPageView` to draw highlight overlays
+  during playback
+- Manual data entry required — potentially use a coordinate picker tool
+
+**Dependency**: PDF rendering (current PR) must be merged first.
+
+**Scope**: Medium — primarily manual data entry work, with a small amount of
+overlay rendering code.
+
+---
+
+## TIL-23. Full Glyph Rendering for All 20 Riwayahs
+
+**Problem**
+PDF rendering is view-only with no word-level interaction. The ideal end state
+is Hafs-like QPC glyph rendering for all 20 riwayahs, with pixel-perfect pages
+and word-level highlighting.
+
+**What's needed**
+1. Obtain page-specific QCF fonts from KFGQPC for each riwayah (they publish
+   these for all 20 mushafs at fonts.qurancomplex.gov.sa)
+2. Extend TIL-22's ayah coordinate data to word-level position data
+   (QUL-equivalent JSON mapping each word to its glyph code and line position)
+3. Use the existing `buildGlyphTextLayout` rendering path — no new renderer
+   needed
+
+**Dependency**: TIL-22 (ayah coordinates) must be completed first, as word-level
+data extends that work.
+
+**Scope**: Very Large — requires obtaining KFGQPC fonts, creating word-level
+position data for 604 pages × 12 riwayahs, and validation.

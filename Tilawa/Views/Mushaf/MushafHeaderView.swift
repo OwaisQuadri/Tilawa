@@ -57,7 +57,7 @@ struct MushafHeaderView: View {
             .font(.subheadline.weight(.semibold))
             .lineLimit(1)
 
-            // Row 2: page · Juz · Hizb (· thumun fraction if not start of hizb)
+            // Row 2: page · riwayah (if non-Hafs) · Juz · Hizb (· thumun fraction)
             // Section is bolded when the current page opens on a thumun boundary
             HStack(spacing: 5) {
                 Text("Page \(mushafVM.currentPage)")

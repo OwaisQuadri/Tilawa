@@ -10,6 +10,7 @@ final class QuranFontProvider: @unchecked Sendable {
     static let minFontSize = 16.0
 
     private let hafsFontName: String
+    private let riwayahFontName: String
     private let surahNameFontName: String
     private let surahHeaderFontName: String
     private var registeredQCFPages: Set<Int> = []
@@ -61,6 +62,21 @@ final class QuranFontProvider: @unchecked Sendable {
             self.hafsFontName = "KFGQPC Uthmanic Script HAFS"
         }
 
+        // Register Scheherazade New font for non-Hafs riwayah rendering
+        if let fontURL = Bundle.main.url(forResource: "ScheherazadeNew-Regular",
+                                          withExtension: "ttf") {
+            var error: Unmanaged<CFError>?
+            CTFontManagerRegisterFontsForURL(fontURL as CFURL, .process, &error)
+            let discoveredName: String? = {
+                guard let descs = CTFontManagerCreateFontDescriptorsFromURL(fontURL as CFURL) as? [CTFontDescriptor],
+                      let desc = descs.first else { return nil }
+                return CTFontDescriptorCopyAttribute(desc, kCTFontNameAttribute) as? String
+            }()
+            self.riwayahFontName = discoveredName ?? "ScheherazadeNew-Regular"
+        } else {
+            self.riwayahFontName = "ScheherazadeNew-Regular"
+        }
+
         // Register surah name font (ligature-based)
         if let fontURL = Bundle.main.url(forResource: "surah-name-v2",
                                           withExtension: "ttf") {
@@ -95,6 +111,7 @@ final class QuranFontProvider: @unchecked Sendable {
     /// Testable initializer.
     init(fontName: String) {
         self.hafsFontName = fontName
+        self.riwayahFontName = "ScheherazadeNew-Regular"
         self.surahNameFontName = "surah-name-v2"
         self.surahHeaderFontName = "QCF_SurahHeader_COLOR"
     }
@@ -102,6 +119,11 @@ final class QuranFontProvider: @unchecked Sendable {
     /// Create a CTFont for the Unicode Hafs font (fallback).
     func hafsFont(size: CGFloat) -> CTFont {
         CTFontCreateWithName(hafsFontName as CFString, size, nil)
+    }
+
+    /// Create a CTFont for non-Hafs riwayah rendering (Scheherazade New).
+    func riwayahFont(size: CGFloat) -> CTFont {
+        CTFontCreateWithName(riwayahFontName as CFString, size, nil)
     }
 
     /// Create a CTFont for a specific Mushaf page using QPC V1 glyph fonts.

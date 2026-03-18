@@ -199,16 +199,14 @@ struct PlaybackSetupSheet: View {
     private var playbackSection: some View {
         if let s = settings {
             Section {
-                LabeledContent {
+                Stepper(value: speedBinding(s), in: 0.5...2.0, step: 0.25) {
                     HStack {
-                        Slider(value: speedBinding(s), in: 0.5...2.0, step: 0.25)
+                        Text("Speed")
+                        Spacer()
                         Text(speedLabel(s.safeSpeed))
                             .font(.subheadline.monospacedDigit())
                             .foregroundStyle(.secondary)
-                            .frame(width: 40, alignment: .trailing)
                     }
-                } label: {
-                    Text("Speed")
                 }
 
                 Picker("Gap between ayaat", selection: gapBinding(s)) {
@@ -418,9 +416,25 @@ struct PlaybackSetupSheet: View {
             ))
         }
 
-        // Each surah on current page
-        if let pageRange = mushafVM.currentPageAyahRange {
+        // Next page — the page below the current one (both visible in vertical scroll)
+        let nextPage = min(604, page + 1)
+        if let nextRange = mushafVM.nextPageAyahRange, nextPage != page {
+            result.append(Preset(label: "pg \(nextPage)", range: AyahRange(start: nextRange.first, end: nextRange.last)))
+
+            // Next page + 1 ayah
+            if let afterNext = metadata.ayah(after: nextRange.last) {
+                result.append(Preset(
+                    label: "pg \(nextPage) +1a",
+                    range: AyahRange(start: nextRange.first, end: afterNext)
+                ))
+            }
+        }
+
+        // Each surah across both visible pages
+        var surahsAdded = Set<Int>()
+        for pageRange in [mushafVM.currentPageAyahRange, mushafVM.nextPageAyahRange].compactMap({ $0 }) {
             for s in pageRange.first.surah...pageRange.last.surah {
+                guard surahsAdded.insert(s).inserted else { continue }
                 let end = AyahRef(surah: s, ayah: metadata.ayahCount(surah: s))
                 result.append(Preset(
                     label: metadata.surahName(s),
@@ -429,36 +443,49 @@ struct PlaybackSetupSheet: View {
             }
         }
 
-        // Current juz — exact boundaries from rub metadata
-        let juzRubs = rubService.rubRange(ofJuz: juzInfo.juz)
-        if let first = rubService.firstAyah(ofRub: juzRubs.lowerBound),
-           let last  = rubService.lastAyah(ofRub: juzRubs.upperBound) {
-            result.append(Preset(
-                label: "Juz \(juzInfo.juz)",
-                range: AyahRange(start: first, end: last)
-            ))
-        }
+        // Juz, Hizb, Thumun presets for both visible pages (deduplicated)
+        let nextPageJuzInfo = juzService.juzInfo(forPage: nextPage)
+        var addedJuz = Set<Int>()
+        var addedHizb = Set<Int>()
+        var addedThumun = Set<Int>()
 
-        // Current hizb — exact boundaries from rub metadata
-        let hizbRubs = rubService.rubRange(ofHizb: juzInfo.hizb)
-        if let first = rubService.firstAyah(ofRub: hizbRubs.lowerBound),
-           let last  = rubService.lastAyah(ofRub: hizbRubs.upperBound) {
-            result.append(Preset(
-                label: "Hizb \(juzInfo.hizb)",
-                range: AyahRange(start: first, end: last)
-            ))
-        }
+        for info in [juzInfo, nextPageJuzInfo] {
+            // Juz
+            if addedJuz.insert(info.juz).inserted {
+                let juzRubs = rubService.rubRange(ofJuz: info.juz)
+                if let first = rubService.firstAyah(ofRub: juzRubs.lowerBound),
+                   let last  = rubService.lastAyah(ofRub: juzRubs.upperBound) {
+                    result.append(Preset(
+                        label: "Juz \(info.juz)",
+                        range: AyahRange(start: first, end: last)
+                    ))
+                }
+            }
 
-        // Current thumun — exact boundaries from rub metadata
-        let rubNum = juzInfo.thumun  // global rub number 1-240
-        if let first = rubService.firstAyah(ofRub: rubNum),
-           let last  = rubService.lastAyah(ofRub: rubNum) {
-            let fracs = ["", " ¼", " ½", " ¾"]
-            let label = "Thumun @ Hizb \(juzInfo.hizb)\(fracs[juzInfo.thumunInHizb - 1])"
-            result.append(Preset(
-                label: label,
-                range: AyahRange(start: first, end: last)
-            ))
+            // Hizb
+            if addedHizb.insert(info.hizb).inserted {
+                let hizbRubs = rubService.rubRange(ofHizb: info.hizb)
+                if let first = rubService.firstAyah(ofRub: hizbRubs.lowerBound),
+                   let last  = rubService.lastAyah(ofRub: hizbRubs.upperBound) {
+                    result.append(Preset(
+                        label: "Hizb \(info.hizb)",
+                        range: AyahRange(start: first, end: last)
+                    ))
+                }
+            }
+
+            // Thumun
+            if addedThumun.insert(info.thumun).inserted {
+                if let first = rubService.firstAyah(ofRub: info.thumun),
+                   let last  = rubService.lastAyah(ofRub: info.thumun) {
+                    let fracs = ["", " ¼", " ½", " ¾"]
+                    let label = "Thumun @ Hizb \(info.hizb)\(fracs[info.thumunInHizb - 1])"
+                    result.append(Preset(
+                        label: label,
+                        range: AyahRange(start: first, end: last)
+                    ))
+                }
+            }
         }
 
         return result
