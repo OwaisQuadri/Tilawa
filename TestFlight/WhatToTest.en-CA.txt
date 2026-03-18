@@ -1,32 +1,59 @@
-## TIL-4: Haptic Feedback
+## TIL-8: PDF Mushaf Rendering for 12 Non-Hafs Riwayahs
 
-**Settings Toggle**
-1. Open Settings tab → verify new "Haptics" section with "Haptic Feedback" toggle
-2. Toggle defaults to ON
+### Riwayah Availability (Settings)
+1. Open Settings → Mushaf Riwayah picker
+2. Verify all 20 riwayahs appear in the list
+3. Verify PDF riwayahs show download indicator (if not downloaded)
 
-**Page Swipes (Mushaf)**
-1. Swipe between mushaf pages → feel a light tap on each page turn
+### PDF Download & Rendering
+1. Select any PDF riwayah (e.g., Hisham, Ibn Kathir, Kisai) from mushaf riwayah picker
+2. Verify download overlay appears with "Download Mushaf" button
+3. Tap download → progress bar visible → reaches 100%
+4. Verify pages render with proper crop insets (no clipped text)
+5. Scroll through several pages → check rendering quality and crop alignment
+6. Close and reopen app → verify PDF still cached and renders instantly
+7. Go to Settings → delete the downloaded PDF → return to mushaf tab → overlay reappears
 
-**Playback Controls (Mini Player)**
-1. Start playback, then tap Play/Pause → feel a medium tap
-2. Tap Skip Forward / Skip Backward → feel a light tap each
-3. Tap Stop (X) → feel a light tap
+### Unicode Text Rendering (Warsh/Qaloon)
+1. Select Warsh from mushaf riwayah picker
+2. Verify pages scroll vertically (not fixed aspect ratio)
+3. Verify content expands naturally to fill available space
+4. Scroll through several pages → check text flows smoothly
+5. Repeat for Qaloon
 
-**Long-Press Ayah (Mushaf)**
-1. Long-press an ayah on the mushaf page → feel a medium tap when the context menu appears
+### Font & Theme Controls
+1. For glyph rendering (Hafs): Settings → adjust font size → verify size changes
+2. For unicode text (Warsh/Qaloon): Settings → adjust font size → verify size changes
+3. For PDF rendering: font controls hidden (expected)
+4. Mushaf Theme settings work across all rendering modes
 
-**Annotation Editor**
-1. Open a recording's annotation editor
-2. Tap the "Marker" button to add a marker → feel a medium tap
-3. Drag a marker handle along the waveform → feel subtle selection ticks during drag
-4. Tap "Finalize" and confirm → feel a warning buzz on the destructive confirmation
+### Dark Mode
+1. Enable dark mode on device
+2. Switch to any PDF riwayah → background is black
+3. Switch to glyph or unicode text mode → background matches theme
+4. Toolbar and navigation remain visible and readable
 
-**Destructive Actions**
-1. Settings → Clear Cache → confirm "Delete All Cached Audio" → feel a warning buzz
-2. Long-press an ayah → "Remove Bookmark" → feel a warning buzz
-3. Playback setup → delete a sliding window preset → feel a warning buzz
+### Playback Integration
+1. Start playback of any reciter in Warsh/Qaloon mode
+2. Verify mushaf auto-scrolls to correct page as audio progresses
+3. Repeat with PDF riwayahs → page-level scrolling works
+4. Page highlighting works (blue/green box around current ayah)
 
-**Toggle OFF**
-1. Go to Settings → turn Haptic Feedback OFF
-2. Repeat all interactions above → verify NO haptic feedback fires
-3. Turn it back ON → verify haptics resume
+### Mushaf Riwayah vs Reciter Riwayah
+1. Playback setup → select a reciter (e.g., Warsh)
+2. Before playing, mushaf riwayah picker still shows whatever was selected (e.g., Qaloon)
+3. Start playback → mushaf auto-switches to match reciter riwayah (Warsh)
+4. After playback, mushaf stays on Warsh
+5. Can manually change mushaf riwayah anytime, independent of reciter
+
+### Page Navigation
+1. Page dividers show correctly (number, dividing line, proper styling)
+2. Tab bar page indicator works for variable page counts
+3. Pages load quickly during rapid swiping
+
+### Edge Cases
+1. Download a PDF riwayah while on a different tab, return to mushaf → verify PDF rendered
+2. Switch between multiple PDF riwayahs quickly → verify correct PDFs load
+3. Rotate device → verify pages re-render correctly
+4. Bookmarks/highlights work across all rendering modes
+
